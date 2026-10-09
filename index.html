@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#090d12">
+    <meta name="description" content="NEXUS-09: a private member community with a secret lab, member IDs, and a shared inner-room chat.">
+    <title>NEXUS-09 — Restricted Access</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <div class="ambient ambient-one" aria-hidden="true"></div>
+    <div class="ambient ambient-two" aria-hidden="true"></div>
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="NEXUS-09 home">
+        <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+        <span><strong>NEXUS-09</strong><small>THE INNER CIRCLE</small></span>
+      </a>
+      <div class="topbar-status"><span class="status-light"></span> DEMO ENVIRONMENT <span class="status-divider"></span> <span id="clock">00:00:00</span></div>
+      <button class="profile-chip" id="profileButton" type="button" aria-label="View your member ID">
+        <span class="avatar avatar-you">F</span><span><strong>FAIZ</strong><small>MEMBER 007</small></span><span class="profile-chevron">⌄</span>
+      </button>
+    </header>
+
+    <div class="demo-banner"><span>SIMULATION MODE</span> Sample room, members, and chat are stored only in this browser. Nothing here is a real security system.</div>
+
+    <section class="auth-screen" id="authScreen" hidden aria-labelledby="authTitle">
+      <div class="auth-brand"><span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span><span><strong>NEXUS-09</strong><small>A PLACE FOR THE CURIOUS</small></span></div>
+      <div class="auth-card">
+        <p class="overline"><span class="tiny-dot"></span> PRIVATE MEMBER ACCESS</p>
+        <h1 id="authTitle">Enter the<br><em>inner circle.</em></h1>
+        <p class="auth-intro">No email needed. Use your member ID and personal secret code.</p>
+        <div class="auth-tabs" role="tablist" aria-label="Member access options">
+          <button class="auth-tab active" id="loginTab" type="button" role="tab" aria-selected="true">SIGN IN</button>
+          <button class="auth-tab" id="joinTab" type="button" role="tab" aria-selected="false">JOIN WITH INVITE</button>
+          <button class="auth-tab" id="ownerTab" type="button" role="tab" aria-selected="false">FIRST SETUP</button>
+        </div>
+        <form class="auth-form" id="loginForm">
+          <label for="loginHandle">MEMBER ID</label>
+          <input class="dark-input" id="loginHandle" autocomplete="username" minlength="3" maxlength="20" placeholder="e.g. faiz007" required>
+          <label for="loginSecret">SECRET CODE</label>
+          <input class="dark-input" id="loginSecret" type="password" autocomplete="current-password" minlength="12" maxlength="128" required>
+          <button class="primary-button" type="submit">SIGN IN <span>→</span></button>
+        </form>
+        <form class="auth-form" id="joinForm" hidden>
+          <label for="joinInvite">ONE-TIME INVITE CODE</label>
+          <input class="dark-input" id="joinInvite" maxlength="16" autocomplete="off" placeholder="NEX-…" required>
+          <label for="joinName">DISPLAY NAME</label>
+          <input class="dark-input" id="joinName" maxlength="32" autocomplete="name" required>
+          <label for="joinHandle">CHOOSE MEMBER ID (3–20 LETTERS/NUMBERS/UNDERSCORES)</label>
+          <input class="dark-input" id="joinHandle" minlength="3" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" autocomplete="username" required>
+          <label for="joinSecret">CREATE SECRET CODE (12+ CHARACTERS)</label>
+          <input class="dark-input" id="joinSecret" type="password" minlength="12" maxlength="128" autocomplete="new-password" required>
+          <button class="primary-button" type="submit">CREATE MEMBER ID <span>→</span></button>
+        </form>
+        <form class="auth-form" id="ownerForm" hidden>
+          <label for="bootstrapCode">ONE-TIME OWNER SETUP CODE</label>
+          <input class="dark-input" id="bootstrapCode" type="password" autocomplete="off" required>
+          <label for="ownerRoomCode">CREATE SECRET ROOM CODE (12+ CHARACTERS)</label>
+          <input class="dark-input" id="ownerRoomCode" type="password" minlength="12" maxlength="128" autocomplete="new-password" required>
+          <label for="ownerName">OWNER DISPLAY NAME</label>
+          <input class="dark-input" id="ownerName" maxlength="32" required>
+          <label for="ownerHandle">OWNER MEMBER ID</label>
+          <input class="dark-input" id="ownerHandle" minlength="3" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" autocomplete="username" required>
+          <label for="ownerSecret">OWNER SECRET CODE (12+ CHARACTERS)</label>
+          <input class="dark-input" id="ownerSecret" type="password" minlength="12" maxlength="128" autocomplete="new-password" required>
+          <button class="primary-button" type="submit">INITIALIZE NEXUS-09 <span>→</span></button>
+        </form>
+        <p class="auth-error" id="authError" role="status" aria-live="polite"></p>
+        <p class="auth-footnote">Your secret code is not an email password. Lost it? Contact an administrator; email recovery is unavailable.</p>
+      </div>
+      <p class="auth-setup-note" id="authSetupNote" hidden>Backend not connected yet. Add the public Supabase project URL and anon key to <code>config.js</code>, then set up Supabase using README.md.</p>
+    </section>
+
+    <main class="app-shell">
+      <aside class="side-rail" aria-label="Main navigation">
+        <button class="rail-button active" type="button" aria-label="Lab overview" title="Lab overview">⌂</button>
+        <button class="rail-button" id="membersNav" type="button" aria-label="Members" title="Members">♙<i>24</i></button>
+        <button class="rail-button" id="chatNav" type="button" aria-label="Group chat" title="Group chat">▤<b></b></button>
+        <span class="rail-spacer"></span>
+        <button class="rail-button invite-rail" id="inviteRail" type="button" aria-label="Invite a member" title="Invite a member">＋</button>
+        <span class="rail-foot">V 0.1</span>
+      </aside>
+
+      <section class="workspace">
+        <div class="welcome-line"><span>NEXUS-09</span><span class="welcome-rule"></span><span>EST. 2049</span></div>
+        <div class="heading-row">
+          <div>
+            <p class="overline"><span class="tiny-dot"></span> A PLACE FOR THE CURIOUS <span class="slash">/</span> ACCESS LEVEL 03</p>
+            <h1>Welcome back,<br><em>Operator.</em></h1>
+            <p class="intro-copy">Your people are inside. The lab is quiet. For now.</p>
+          </div>
+          <div class="head-actions">
+            <span class="online-count"><i></i><strong id="onlineCount">08</strong> ONLINE</span>
+            <button class="outline-button" id="inviteButton" type="button"><span>＋</span> Invite member</button>
+          </div>
+        </div>
+
+        <section class="lab-scene" aria-labelledby="sceneTitle">
+          <div class="scene-topline"><span><i class="tiny-dot"></i> LIVE FACILITY VIEW</span><span>CAM 01 <b>●</b></span></div>
+          <div class="scene-grid" aria-hidden="true"></div>
+          <div class="room-number">09<span>SUBLEVEL</span></div>
+          <div class="scene-label">
+            <span class="scene-index">01 <i>/ 02</i></span>
+            <h2 id="sceneTitle">The outer lab</h2>
+            <p>AUTHORIZED PERSONNEL ONLY</p>
+          </div>
+          <div class="lab-visual" aria-label="Stylized three-dimensional secret laboratory entrance">
+            <div class="back-wall">
+              <div class="wall-panel panel-left"><span class="wall-led"></span><span class="wall-lines"></span><span class="wall-display">SYS<br>ONLINE</span></div>
+              <div class="back-window"><span class="window-cross"></span><span class="window-orb"></span><span class="window-caption">CONTAINMENT BAY / 04</span></div>
+              <div class="wall-panel panel-right"><span class="wall-led"></span><span class="wall-lines"></span><span class="wall-display">O₂<br>98.4%</span></div>
+            </div>
+            <div class="side-wall"></div>
+            <div class="floor-plane"><span class="floor-light"></span><span class="floor-stripe"></span></div>
+            <div class="lab-door" id="labDoor">
+              <div class="door-frame">
+                <div class="door-inner">
+                  <div class="door-window"><span></span><i></i></div>
+                  <div class="door-console"><span class="console-readout">ACCESS<br>CONTROL</span><span class="console-light"></span><span class="console-key">⌑</span></div>
+                  <span class="door-id">09 <i>AUTHORIZED</i></span>
+                </div>
+              </div>
+              <div class="door-halo"></div>
+            </div>
+            <div class="scene-object object-left"><span></span><i></i></div>
+            <div class="scene-object object-right"><span></span><i></i></div>
+            <div class="scene-scan"></div>
+          </div>
+          <div class="scene-corner scene-corner-left">LAT 37° 14' 08"N<br>LON 115° 48' 40"W</div>
+          <div class="scene-corner scene-corner-right">SECURE LINK <i>●</i></div>
+          <div class="scene-lock-panel">
+            <div class="lock-emblem" aria-hidden="true"><span>⌑</span></div>
+            <div><strong>THE HIDDEN ROOM</strong><small>SECONDARY AUTHORIZATION REQUIRED</small></div>
+            <button class="enter-room-button" id="enterRoomButton" type="button">ENTER LAB <span>↗</span></button>
+          </div>
+          <div class="scene-footer"><span><i></i> FACILITY STATUS: OPERATIONAL</span><span>CLICK ENTER LAB TO ACCESS THE DEMO ROOM</span></div>
+        </section>
+
+        <section class="dashboard-grid">
+          <article class="briefing-panel">
+            <div class="section-top"><div><p class="overline">TODAY'S BRIEFING</p><h2>Inside the facility</h2></div><span class="panel-symbol">⌁</span></div>
+            <p class="briefing-copy">A quiet channel for curious minds. Share ideas, trade theories, and keep the good secrets among friends.</p>
+            <div class="briefing-stats">
+              <div><strong id="memberCount">24</strong><span>MEMBERS</span></div>
+              <div><strong>03</strong><span>ACTIVE ROOMS</span></div>
+              <div><strong>09</strong><span>NEW MESSAGES</span></div>
+            </div>
+            <button class="text-link" id="openChatLink" type="button">Open group channel <span>→</span></button>
+          </article>
+
+          <article class="members-panel" id="membersPanel">
+            <div class="section-top"><div><p class="overline">CLEARED PERSONNEL</p><h2>On the roster <span id="rosterCount">24</span></h2></div><button class="icon-button" id="allMembersButton" type="button" aria-label="View all members">↗</button></div>
+            <div class="member-strip" id="memberStrip" aria-label="Featured members"></div>
+            <div class="roster-foot"><span><i class="tiny-dot"></i> 24 ACTIVE CLEARANCES</span><button class="text-link" id="viewMembersButton" type="button">View roster <span>→</span></button></div>
+          </article>
+        </section>
+        <footer class="workspace-footer"><span>NEXUS-09 <b>·</b> PRIVATE BY INVITATION</span><span>A PLACE FOR THE CURIOUS <b>✳</b></span></footer>
+      </section>
+    </main>
+
+    <dialog class="app-dialog" id="labAccessDialog">
+      <div class="dialog-shell">
+        <button class="dialog-close" data-close type="button" aria-label="Close dialog">×</button>
+        <span class="dialog-mark">⌑</span>
+        <p class="overline">FACILITY ENTRY <span class="slash">/</span> LEVEL 01</p>
+        <h2>Enter the secret lab.</h2>
+        <p class="dialog-copy">First clearance opens the outer lab. This is a visual demo, not real authentication.</p>
+        <form id="labAccessForm" class="dialog-form">
+          <label for="labAccessCode">FACILITY ACCESS CODE</label>
+          <input id="labAccessCode" class="dark-input" type="password" autocomplete="off" placeholder="Enter demo code" required>
+          <p class="dialog-error" id="labAccessError" role="status"></p>
+          <button class="primary-button" type="submit">VERIFY FACILITY ACCESS <span>→</span></button>
+        </form>
+        <p class="demo-code-hint">DEMO CODE <code>LAB-0427</code></p>
+      </div>
+    </dialog>
+
+    <dialog class="app-dialog" id="accessDialog">
+      <div class="dialog-shell">
+        <button class="dialog-close" data-close type="button" aria-label="Close dialog">×</button>
+        <span class="dialog-mark">⌑</span>
+        <p class="overline">RESTRICTED AREA <span class="slash">/</span> LEVEL 02</p>
+        <h2 id="accessTitle">Enter the hidden room.</h2>
+        <p class="dialog-copy" id="accessCopy">A second code opens the inner lab. This is a visual demo, not real authentication.</p>
+        <form id="accessForm" class="dialog-form">
+          <label for="accessCode">ROOM ACCESS CODE</label>
+          <input id="accessCode" class="dark-input" type="password" maxlength="128" autocomplete="off" placeholder="Enter room code" required>
+          <p class="dialog-error" id="accessError" role="status"></p>
+          <button class="primary-button" type="submit">VERIFY ACCESS <span>→</span></button>
+        </form>
+        <p class="demo-code-hint">DEMO CODE <code id="demoCodeHint">ROOM-091</code></p>
+      </div>
+    </dialog>
+
+    <dialog class="app-dialog inner-dialog" id="innerDialog">
+      <div class="dialog-shell inner-shell">
+        <button class="dialog-close" data-close type="button" aria-label="Close dialog">×</button>
+        <div class="inner-room-visual" aria-hidden="true"><span class="inner-orb"></span><span class="inner-ring ring-one"></span><span class="inner-ring ring-two"></span><span class="inner-room-floor"></span><span class="inner-room-label">CORE ROOM / 09-B</span></div>
+        <p class="overline"><span class="tiny-dot"></span> SECONDARY CLEARANCE ACCEPTED</p>
+        <h2>You're in the<br><em>inner circle.</em></h2>
+        <p class="dialog-copy">This is the secret room preview. The real-time, multi-device group chat will need an online backend.</p>
+        <div class="inner-quick-actions"><button class="primary-button" id="innerChatButton" type="button">OPEN GROUP CHAT <span>→</span></button><button class="secondary-button" id="innerRosterButton" type="button">MEET THE MEMBERS</button></div>
+        <span class="room-ambient">ALL SYSTEMS NOMINAL <i>●</i></span>
+      </div>
+    </dialog>
+
+    <dialog class="app-dialog wide-dialog" id="chatDialog">
+      <div class="dialog-shell content-shell">
+        <button class="dialog-close" data-close type="button" aria-label="Close dialog">×</button>
+        <p class="overline"><span class="tiny-dot"></span> ENCRYPTED CHANNEL <span class="slash">/</span> #INNER-CIRCLE</p>
+        <h2>Group channel <span class="channel-live"><i></i> DEMO</span></h2>
+        <div class="chat-layout">
+          <div class="chat-thread" id="chatThread" aria-live="polite"></div>
+          <aside class="chat-aside"><strong>CHANNEL INFO</strong><span>24 members</span><span>Messages in this preview are saved only in this browser.</span><div class="chat-aside-line"></div><span class="chat-aside-status"><i></i> PRIVATE DEMO</span></aside>
+        </div>
+        <form class="chat-compose" id="chatForm"><label class="visually-hidden" for="chatInput">Write a message</label><input id="chatInput" maxlength="500" autocomplete="off" placeholder="Send a message to the group…"><button type="submit" aria-label="Send message">↑</button></form>
+        <p class="chat-demo-note">DEMO ONLY — other visitors will not see these messages.</p>
+      </div>
+    </dialog>
+
+    <dialog class="app-dialog wide-dialog" id="rosterDialog">
+      <div class="dialog-shell content-shell">
+        <button class="dialog-close" data-close type="button" aria-label="Close dialog">×</button>
+        <p class="overline">ACCESS DIRECTORY <span class="slash">/</span> PERSONNEL</p>
+        <h2>Cleared members <span class="roster-limit">24 / 30</span></h2>
+        <p class="dialog-copy">Tap any ID card to see that member's demo profile. Names and identities are fictional sample data.</p>
+        <div class="roster-grid" id="rosterGrid"></div>
+        <button class="primary-button roster-invite" id="rosterInviteButton" type="button">INVITE SOMEONE <span>＋</span></button>
+      </div>
+    </dialog>
+
+    <dialog class="app-dialog" id="memberDialog">
+      <div class="dialog-shell member-shell">
+        <button class="dialog-close" data-close type="button" aria-label="Close dialog">×</button>
+        <div class="id-card-large" id="largeIdCard"></div>
+        <p class="overline">PERSONNEL FILE <span class="slash">/</span> VERIFIED MEMBER</p>
+        <h2 id="memberName">Member name</h2>
+        <p class="member-bio" id="memberBio"></p>
+        <div class="member-meta"><span>ACCESS TIER <strong id="memberTier"></strong></span><span>STATUS <strong class="member-active"><i></i> ACTIVE</strong></span></div>
+      </div>
+    </dialog>
+
+    <dialog class="app-dialog" id="inviteDialog">
+      <div class="dialog-shell">
+        <button class="dialog-close" data-close type="button" aria-label="Close dialog">×</button>
+        <span class="dialog-mark invite-mark">＋</span>
+        <p class="overline">GUEST CLEARANCE <span class="slash">/</span> INVITATION</p>
+        <h2>Bring someone in.</h2>
+        <p class="dialog-copy">Create a demo invitation code. In a real version, invites would be verified by the online service.</p>
+        <div class="invite-capacity"><span>AVAILABLE SEATS</span><strong><b id="availableSeats">06</b> / 30</strong></div>
+        <button class="primary-button" id="generateInviteButton" type="button">GENERATE INVITE CODE <span>＋</span></button>
+        <div class="generated-invite" id="generatedInvite" hidden><span>ONE-TIME DEMO INVITE</span><code id="inviteCode"></code><button class="secondary-button" id="copyInviteButton" type="button">COPY CODE</button></div>
+        <p class="dialog-error" id="inviteError" role="status"></p>
+      </div>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script src="./config.js"></script>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
