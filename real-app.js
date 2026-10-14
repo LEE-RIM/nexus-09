@@ -560,7 +560,7 @@ function requestRoomAccess(room) {
   document.querySelector("#accessCopy").textContent =
     "Enter this room's private access code. Access expires after 30 minutes.";
   document.querySelector("#accessDialog .dialog-form label").textContent = "ROOM ACCESS CODE";
-  document.querySelector("#demoCodeHint").textContent = "ROOM CODE PROVIDED BY THE OWNER TEAM";
+  document.querySelector("#accessDialog .demo-code-hint").textContent = "ROOM CODE PROVIDED BY THE OWNER TEAM.";
   document.querySelector("#accessCode").value = "";
   document.querySelector("#accessError").textContent = "";
   openDialog(document.querySelector("#accessDialog"));
