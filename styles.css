@@ -278,6 +278,20 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .chat-compose input::placeholder { color: #607078; }
 .chat-compose button { width: 39px; border: 1px solid rgb(123 228 227 / 36%); border-radius: 4px; background: rgb(123 228 227 / 9%); color: var(--cyan); font-size: 17px; cursor: pointer; }
 .chat-demo-note { margin: 9px 0 0; color: #66757d; font: 6px var(--mono); letter-spacing: .5px; }
+.room-switch-button { min-height: 27px; padding: 0 8px; font-size: 7px; letter-spacing: .45px; }
+.room-list, .managed-room-list { display: flex; flex-direction: column; gap: 7px; margin-top: 15px; }
+.room-choice { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px; border: 1px solid #293a42; border-radius: 4px; background: linear-gradient(110deg, #142129, #0c1217); text-align: left; cursor: pointer; }
+.room-choice:hover, .room-choice.is-default-room { border-color: rgb(123 228 227 / 38%); }
+.room-choice strong { color: #d6e1e3; font: 9px var(--mono); }
+.room-choice small { color: #788992; font: 6px var(--mono); letter-spacing: .5px; text-align: right; }
+.room-manage-button { margin-top: 13px; }
+.managed-room-row { display: flex; align-items: center; gap: 8px; padding: 8px 9px; border: 1px solid var(--line); border-radius: 4px; background: #0c1217; }
+.managed-room-row > span { min-width: 0; flex: 1; overflow: hidden; color: #becdd0; font: 7px var(--mono); text-overflow: ellipsis; white-space: nowrap; }
+.managed-room-row > small { color: #76858d; font: 6px var(--mono); }
+.managed-room-row .feature-action-button { min-height: 24px; padding: 3px 6px; font-size: 6px; }
+#createRoomForm > label:not(:first-child) { margin-top: 12px; }
+.dialog-form .dialog-error { min-height: 0; }
+.room-switch-button[hidden] { display: none; }
 .message-feature-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
 .reaction-chip, .reaction-add, .reaction-entry button, .message-report-button, .feature-action-button { min-height: 24px; padding: 3px 7px; border: 1px solid #2a3a43; border-radius: 4px; background: #111a20; color: #a8b5ba; font: 7px var(--mono); cursor: pointer; }
 .reaction-chip.selected { border-color: rgb(123 228 227 / 54%); color: var(--cyan); background: rgb(123 228 227 / 9%); }

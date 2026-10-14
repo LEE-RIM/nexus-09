@@ -12,6 +12,8 @@ const authError = document.querySelector("#authError");
 const chatThread = document.querySelector("#chatThread");
 let currentProfile = null;
 let roomUnlockedUntil = 0;
+let activeRoom = null;
+let pendingRoom = null;
 let roomExpiryTimer;
 let presenceChannel;
 let messagesChannel;
@@ -45,6 +47,7 @@ document.querySelector("#chatDialog .chat-aside > span:nth-child(3)").textConten
   "Messages are shared live with authenticated NEXUS-09 members who have unlocked the room.";
 document.querySelector("#chatDialog .chat-demo-note").textContent =
   "MEMBER MESSAGES SYNC LIVE WHILE ROOM ACCESS IS ACTIVE.";
+document.querySelector("#switchRoomButton").hidden = false;
 const chatStatus = document.querySelector("#chatDialog .chat-aside-status");
 const chatStatusLight = document.createElement("i");
 chatStatus.replaceChildren(chatStatusLight, document.createTextNode(" PRIVATE ROOM"));
@@ -485,16 +488,20 @@ function openDialog(dialog) {
   if (!dialog.open) dialog.showModal();
 }
 
+function roomStatusMessage(text) {
+  const message = document.createElement("p");
+  message.className = "feature-empty";
+  message.textContent = text;
+  return message;
+}
+
 function requestDestination(destination) {
-  if (roomUnlockedUntil > Date.now()) {
+  if (activeRoom && roomUnlockedUntil > Date.now()) {
     showDestination(destination);
     return;
   }
   pendingDestination = destination;
-  document.querySelector("#accessCode").value = "";
-  document.querySelector("#accessError").textContent = "";
-  openDialog(document.querySelector("#accessDialog"));
-  window.setTimeout(() => document.querySelector("#accessCode").focus(), 30);
+  void openRoomPicker();
 }
 
 function showDestination(destination) {
@@ -503,19 +510,88 @@ function showDestination(destination) {
   if (destination === "invite") openInvite();
 }
 
-async function unlockRoom(roomCode) {
-  const { data, error } = await supabase.functions.invoke("unlock-room", { body: { roomCode } });
+async function loadRooms() {
+  const { data, error } = await supabase
+    .from("rooms")
+    .select("id,name,is_default,is_active,created_at")
+    .order("is_default", { ascending: false })
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+async function openRoomPicker() {
+  const list = document.querySelector("#roomList");
+  list.replaceChildren();
+  const loading = document.createElement("p");
+  loading.className = "feature-empty";
+  loading.textContent = "Loading available rooms…";
+  list.append(loading);
+  document.querySelector("#manageRoomsButton").hidden =
+    !["owner", "sub_owner"].includes(currentProfile?.role);
+  openDialog(document.querySelector("#roomsDialog"));
+  try {
+    const rooms = (await loadRooms()).filter((room) => room.is_active);
+    if (!rooms.length) {
+      list.replaceChildren(roomStatusMessage("No active rooms are available."));
+      return;
+    }
+    list.replaceChildren(...rooms.map((room) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `room-choice${room.is_default ? " is-default-room" : ""}`;
+      const name = document.createElement("strong");
+      name.textContent = room.name;
+      const note = document.createElement("small");
+      note.textContent = `${room.is_default ? "MAIN ROOM" : "PRIVATE ROOM"} · CODE REQUIRED`;
+      button.append(name, note);
+      button.addEventListener("click", () => requestRoomAccess(room));
+      return button;
+    }));
+  } catch (error) {
+    console.error("Could not load NEXUS-09 rooms.", error);
+    list.replaceChildren(roomStatusMessage("Rooms could not be loaded. Check your connection and try again."));
+  }
+}
+
+function requestRoomAccess(room) {
+  pendingRoom = room;
+  document.querySelector("#accessTitle").textContent = `Enter ${room.name}.`;
+  document.querySelector("#accessCopy").textContent =
+    "Enter this room's private access code. Access expires after 30 minutes.";
+  document.querySelector("#accessDialog .dialog-form label").textContent = "ROOM ACCESS CODE";
+  document.querySelector("#demoCodeHint").textContent = "ROOM CODE PROVIDED BY THE OWNER TEAM";
+  document.querySelector("#accessCode").value = "";
+  document.querySelector("#accessError").textContent = "";
+  openDialog(document.querySelector("#accessDialog"));
+  window.setTimeout(() => document.querySelector("#accessCode").focus(), 30);
+}
+
+async function unlockRoom(roomId, roomCode) {
+  const { data, error } = await supabase.functions.invoke("unlock-room", { body: { roomId, roomCode } });
   if (error) throw new Error(await edgeFunctionError(error, data, "Room code could not be checked."));
   if (data?.error) throw new Error(data.error);
-  if (!data?.unlocked || !data.expiresAt) throw new Error("Room access was not confirmed by the server.");
+  if (!data?.unlocked || !data.expiresAt || data.roomId !== roomId) {
+    throw new Error("Room access was not confirmed by the server.");
+  }
   const expiresAt = Date.parse(data.expiresAt);
   if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
     throw new Error("The server returned an invalid room-access expiry. Try again.");
   }
+  if (messagesChannel) {
+    const previousChannel = messagesChannel;
+    messagesChannel = null;
+    const status = await supabase.removeChannel(previousChannel);
+    if (status !== "ok") console.error("Could not close the previous NEXUS-09 room channel.", status);
+  }
+  activeRoom = pendingRoom;
+  pendingRoom = null;
   roomUnlockedUntil = expiresAt;
+  document.querySelector("#activeRoomName").textContent = `#${activeRoom.name.toUpperCase()}`;
   window.clearTimeout(roomExpiryTimer);
   roomExpiryTimer = window.setTimeout(() => {
     roomUnlockedUntil = 0;
+    activeRoom = null;
     const channel = messagesChannel;
     messagesChannel = null;
     if (channel) {
@@ -527,7 +603,7 @@ async function unlockRoom(roomCode) {
       document.querySelector("#chatDialog").close();
       document.querySelector("#innerDialog").close();
     }
-    showToast("Secret-room access expired. Enter the room code again to continue.");
+    showToast("Room access expired. Choose a room and enter its code again.");
   }, Math.max(0, roomUnlockedUntil - Date.now()));
   subscribeToMessages();
 }
@@ -549,7 +625,8 @@ document.querySelector("#accessForm").addEventListener("submit", async (event) =
   button.disabled = true;
   button.textContent = "VERIFYING WITH SERVER…";
   try {
-    await unlockRoom(document.querySelector("#accessCode").value);
+    if (!pendingRoom) throw new Error("Choose a room before entering its access code.");
+    await unlockRoom(pendingRoom.id, document.querySelector("#accessCode").value);
     document.querySelector("#accessDialog").close();
     const destination = pendingDestination || "inner";
     pendingDestination = null;
@@ -560,6 +637,103 @@ document.querySelector("#accessForm").addEventListener("submit", async (event) =
     button.disabled = false;
     button.textContent = "UNLOCK ROOM →";
   }
+});
+
+document.querySelector("#manageRoomsButton").addEventListener("click", () => {
+  if (!["owner", "sub_owner"].includes(currentProfile?.role)) return;
+  document.querySelector("#createRoomForm").reset();
+  document.querySelector("#manageRoomsError").textContent = "";
+  openDialog(document.querySelector("#manageRoomsDialog"));
+  void loadManagedRooms();
+});
+
+async function loadManagedRooms() {
+  const list = document.querySelector("#managedRoomList");
+  try {
+    const rooms = await loadRooms();
+    list.replaceChildren(...rooms.map((room) => {
+      const row = document.createElement("div");
+      row.className = "managed-room-row";
+      const name = document.createElement("span");
+      name.textContent = `${room.name}${room.is_default ? " · DEFAULT" : ""}`;
+      const status = document.createElement("small");
+      status.textContent = room.is_active ? "ACTIVE" : "ARCHIVED";
+      row.append(name, status);
+      if (room.is_active && !room.is_default) {
+        const archive = document.createElement("button");
+        archive.type = "button";
+        archive.className = "feature-action-button";
+        archive.textContent = "ARCHIVE";
+        archive.addEventListener("click", () => void archiveRoom(room.id));
+        row.append(archive);
+      }
+      return row;
+    }));
+  } catch (error) {
+    console.error("Could not load NEXUS-09 room settings.", error);
+    list.replaceChildren(roomStatusMessage("Room settings could not be loaded."));
+  }
+}
+
+async function archiveRoom(roomId) {
+  try {
+    const { data, error } = await supabase.functions.invoke("manage-rooms", {
+      body: { action: "archive", roomId }
+    });
+    if (error) throw new Error(await edgeFunctionError(error, data, "Room could not be archived."));
+    if (data?.error) throw new Error(data.error);
+    if (activeRoom?.id === roomId) {
+      roomUnlockedUntil = 0;
+      activeRoom = null;
+      if (messagesChannel) {
+        const channel = messagesChannel;
+        messagesChannel = null;
+        const status = await supabase.removeChannel(channel);
+        if (status !== "ok") console.error("Could not close the archived room channel.", status);
+      }
+      document.querySelector("#chatDialog").close();
+    }
+    await loadManagedRooms();
+    showToast("Room archived. Its saved messages have been kept.");
+  } catch (error) {
+    console.error("Could not archive a NEXUS-09 room.", error);
+    document.querySelector("#manageRoomsError").textContent =
+      friendlyError(error, "The room could not be archived. Try again.");
+  }
+}
+
+document.querySelector("#createRoomForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!["owner", "sub_owner"].includes(currentProfile?.role)) return;
+  const form = event.currentTarget;
+  const button = form.querySelector('button[type="submit"]');
+  const errorBox = document.querySelector("#manageRoomsError");
+  errorBox.textContent = "";
+  button.disabled = true;
+  try {
+    const { data, error } = await supabase.functions.invoke("manage-rooms", {
+      body: {
+        action: "create",
+        name: document.querySelector("#newRoomName").value,
+        roomCode: document.querySelector("#newRoomCode").value
+      }
+    });
+    if (error) throw new Error(await edgeFunctionError(error, data, "Room could not be created."));
+    if (data?.error) throw new Error(data.error);
+    form.reset();
+    await loadManagedRooms();
+    showToast("Private room created. Share its code only with intended members.");
+  } catch (error) {
+    console.error("Could not create a NEXUS-09 room.", error);
+    errorBox.textContent = friendlyError(error, "Room could not be created. Check its name and code.");
+  } finally {
+    button.disabled = false;
+  }
+});
+
+document.querySelector("#switchRoomButton").addEventListener("click", () => {
+  pendingDestination = "chat";
+  void openRoomPicker();
 });
 
 function messageElement(message, reactions = []) {
@@ -635,10 +809,11 @@ function renderMessages(messages) {
 }
 
 async function loadMessages() {
-  if (roomUnlockedUntil <= Date.now()) throw new Error("Room access expired. Enter the code again.");
+  if (!activeRoom || roomUnlockedUntil <= Date.now()) throw new Error("Room access expired. Choose a room and enter its code again.");
   const { data, error } = await supabase
     .from("messages")
     .select("id,body,created_at,sender_id,profiles!messages_sender_id_fkey(display_name,handle,role)")
+    .eq("room_id", activeRoom.id)
     .order("id", { ascending: false })
     .limit(100);
   if (error) throw error;
@@ -660,10 +835,11 @@ async function loadMessages() {
 }
 
 function subscribeToMessages() {
-  if (messagesChannel || roomUnlockedUntil <= Date.now()) return;
+  if (messagesChannel || !activeRoom || roomUnlockedUntil <= Date.now()) return;
+  const roomId = activeRoom.id;
   messagesChannel = supabase
-    .channel("nexus09-room-messages", { config: { private: true } })
-    .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, async () => {
+    .channel(`nexus09-room-${roomId}`, { config: { private: true } })
+    .on("postgres_changes", { event: "*", schema: "public", table: "messages", filter: `room_id=eq.${roomId}` }, async () => {
       try {
         await loadMessages();
       } catch (error) {
@@ -689,6 +865,7 @@ function subscribeToMessages() {
 
 async function openChat() {
   try {
+    if (!activeRoom || roomUnlockedUntil <= Date.now()) throw new Error("Choose a room and enter its code first.");
     await loadMessages();
     openDialog(document.querySelector("#chatDialog"));
     window.setTimeout(() => document.querySelector("#chatInput").focus(), 30);
@@ -709,7 +886,12 @@ document.querySelector("#chatForm").addEventListener("submit", async (event) => 
   const send = event.currentTarget.querySelector("button");
   send.disabled = true;
   try {
-    const { error } = await supabase.from("messages").insert({ sender_id: currentProfile.id, body: text });
+    if (!activeRoom || roomUnlockedUntil <= Date.now()) throw new Error("Room access expired. Choose a room and enter its code again.");
+    const { error } = await supabase.from("messages").insert({
+      sender_id: currentProfile.id,
+      room_id: activeRoom.id,
+      body: text
+    });
     if (error) throw error;
     input.value = "";
     await loadMessages();
@@ -786,6 +968,9 @@ for (const dialog of document.querySelectorAll(".app-dialog")) {
 
 async function signOutMember() {
   roomUnlockedUntil = 0;
+  activeRoom = null;
+  pendingRoom = null;
+  pendingDestination = null;
   window.clearTimeout(roomExpiryTimer);
   await removeRealtimeChannels();
   await communityFeatures?.dispose();
@@ -814,6 +999,9 @@ async function start() {
     if (event === "SIGNED_OUT" && currentProfile) {
       currentProfile = null;
       roomUnlockedUntil = 0;
+      activeRoom = null;
+      pendingRoom = null;
+      pendingDestination = null;
       window.clearTimeout(roomExpiryTimer);
       void removeRealtimeChannels();
       void communityFeatures?.dispose();

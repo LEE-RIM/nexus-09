@@ -204,6 +204,36 @@
       </div>
     </dialog>
 
+    <dialog class="app-dialog" id="roomsDialog">
+      <div class="dialog-shell content-shell">
+        <button class="dialog-close" data-close type="button" aria-label="Close dialog">×</button>
+        <p class="overline">PRIVATE CHANNELS <span class="slash">/</span> ROOM DIRECTORY</p>
+        <h2>Choose a room</h2>
+        <p class="dialog-copy">Each room has a separate code and private chat. Ask the owner team for access.</p>
+        <div class="room-list" id="roomList" aria-live="polite"></div>
+        <button class="secondary-button room-manage-button" id="manageRoomsButton" type="button" hidden>CREATE / MANAGE ROOMS</button>
+      </div>
+    </dialog>
+
+    <dialog class="app-dialog" id="manageRoomsDialog">
+      <div class="dialog-shell">
+        <button class="dialog-close" data-close type="button" aria-label="Close dialog">×</button>
+        <span class="dialog-mark">＋</span>
+        <p class="overline">OWNER TOOLS <span class="slash">/</span> ROOM MANAGEMENT</p>
+        <h2>Create a room.</h2>
+        <p class="dialog-copy">Only the Main Owner and Sub-owner can create rooms. Keep each room code private and share it only with the intended members.</p>
+        <form class="dialog-form" id="createRoomForm">
+          <label for="newRoomName">ROOM NAME</label>
+          <input id="newRoomName" class="dark-input" type="text" maxlength="48" autocomplete="off" placeholder="e.g. Project Studio" required>
+          <label for="newRoomCode">ROOM ACCESS CODE</label>
+          <input id="newRoomCode" class="dark-input" type="password" minlength="12" maxlength="128" autocomplete="new-password" placeholder="Use a unique code (12+ characters)" required>
+          <p class="dialog-error" id="manageRoomsError" role="status"></p>
+          <button class="primary-button" type="submit">CREATE PRIVATE ROOM <span>＋</span></button>
+        </form>
+        <div class="managed-room-list" id="managedRoomList"></div>
+      </div>
+    </dialog>
+
     <dialog class="app-dialog inner-dialog" id="innerDialog">
       <div class="dialog-shell inner-shell">
         <button class="dialog-close" data-close type="button" aria-label="Close dialog">×</button>
@@ -219,8 +249,8 @@
     <dialog class="app-dialog wide-dialog" id="chatDialog">
       <div class="dialog-shell content-shell">
         <button class="dialog-close" data-close type="button" aria-label="Close dialog">×</button>
-        <p class="overline"><span class="tiny-dot"></span> ENCRYPTED CHANNEL <span class="slash">/</span> #INNER-CIRCLE</p>
-        <h2>Group channel <span class="channel-live"><i></i> DEMO</span></h2>
+        <p class="overline"><span class="tiny-dot"></span> ENCRYPTED CHANNEL <span class="slash">/</span> <span id="activeRoomName">#INNER-CIRCLE</span></p>
+        <h2>Group channel <button class="secondary-button room-switch-button" id="switchRoomButton" type="button" hidden>SWITCH ROOM</button><span class="channel-live"><i></i> DEMO</span></h2>
         <div class="chat-layout">
           <div class="chat-thread" id="chatThread" aria-live="polite"></div>
           <aside class="chat-aside"><strong>CHANNEL INFO</strong><span>24 members</span><span>Messages in this preview are saved only in this browser.</span><div class="chat-aside-line"></div><span class="chat-aside-status"><i></i> PRIVATE DEMO</span></aside>
