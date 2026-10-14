@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { addReactionControls, addReportButton, initCommunityFeatures } from "./community-features.js";
 
 const settings = window.NEXUS_CONFIG;
 const supabase = createClient(settings.supabaseUrl, settings.supabaseAnonKey, {
@@ -18,6 +19,8 @@ let inviteCreated = false;
 let pendingDestination = null;
 let toastTimer;
 let memberInitializing = false;
+let profilesCache = [];
+let communityFeatures;
 
 document.body.classList.add("real-mode");
 const demoBanner = document.querySelector(".demo-banner");
@@ -251,6 +254,16 @@ async function initializeMember(user) {
     document.querySelector("#onlineCount").textContent = "01";
     document.querySelector("#labAccessCode").value = "";
     await loadRoster();
+    if (!communityFeatures) {
+      communityFeatures = initCommunityFeatures({
+        supabase,
+        getCurrentProfile: () => currentProfile,
+        getMembers: () => profilesCache,
+        showToast,
+        openDialog
+      });
+    }
+    await communityFeatures.initialize(profile);
     subscribePresence();
   } finally {
     memberInitializing = false;
@@ -269,6 +282,7 @@ async function loadRoster() {
     return;
   }
   const roster = data || [];
+  profilesCache = roster;
   const total = count ?? roster.length;
   document.querySelector("#memberCount").textContent = String(total).padStart(2, "0");
   document.querySelector("#rosterCount").textContent = String(total);
@@ -279,12 +293,17 @@ async function loadRoster() {
   document.querySelector("#chatDialog .chat-aside > span:nth-child(3)").textContent =
     "Messages are shared live with authenticated NEXUS-09 members who have unlocked the room.";
   renderRoster(roster);
+  if (communityFeatures) {
+    await communityFeatures.loadConversations();
+    if (currentProfile?.role === "owner") await communityFeatures.loadReports();
+  }
 }
 
 function toMember(profile) {
   const colors = ["cyan", "violet", "amber", "rose", "blue", "green"];
   return {
     id: profile.handle,
+    userId: profile.id,
     name: profile.display_name,
     role: profile.role === "owner" ? "Facility owner" : "NEXUS-09 member",
     tier: profile.role === "owner" ? "OWNER" : "MEMBER",
@@ -354,6 +373,9 @@ function showMember(member) {
   document.querySelector("#memberName").textContent = member.name;
   document.querySelector("#memberBio").textContent = member.bio;
   document.querySelector("#memberTier").textContent = member.tier;
+  const messageButton = document.querySelector("#memberDmButton");
+  messageButton.dataset.memberId = member.userId || "";
+  messageButton.hidden = !member.userId || member.userId === currentProfile?.id;
   openDialog(document.querySelector("#memberDialog"));
 }
 
@@ -481,7 +503,7 @@ document.querySelector("#accessForm").addEventListener("submit", async (event) =
   }
 });
 
-function messageElement(message) {
+function messageElement(message, reactions = []) {
   const profile = message.profiles || {};
   const own = message.sender_id === currentProfile?.id;
   const color = own ? "cyan" : ["violet", "amber", "rose", "blue", "green"][Array.from(profile.handle || "").reduce((sum, char) => sum + char.charCodeAt(0), 0) % 5];
@@ -504,6 +526,23 @@ function messageElement(message) {
   body.textContent = message.body;
   heading.append(name, time);
   copy.append(heading, body);
+  addReactionControls(copy, {
+    supabase,
+    messageId: message.id,
+    kind: "group",
+    reactions,
+    userId: currentProfile.id,
+    refresh: loadMessages,
+    showToast
+  });
+  if (!own && communityFeatures) {
+    addReportButton(heading, {
+      kind: "group",
+      messageId: message.id,
+      body: message.body,
+      openReport: communityFeatures.openReport
+    });
+  }
   item.append(avatar, copy);
   return item;
 }
@@ -516,7 +555,7 @@ function renderMessages(messages) {
     chatThread.replaceChildren(empty);
     return;
   }
-  chatThread.replaceChildren(...messages.map(messageElement));
+  chatThread.replaceChildren(...messages);
   chatThread.scrollTop = chatThread.scrollHeight;
 }
 
@@ -528,19 +567,41 @@ async function loadMessages() {
     .order("id", { ascending: false })
     .limit(100);
   if (error) throw error;
-  renderMessages((data || []).reverse());
+  const messages = (data || []).reverse();
+  const ids = messages.map((message) => message.id);
+  let reactions = [];
+  if (ids.length) {
+    const result = await supabase
+      .from("message_reactions")
+      .select("id,user_id,group_message_id,emoji")
+      .in("group_message_id", ids);
+    if (result.error) throw result.error;
+    reactions = result.data || [];
+  }
+  renderMessages(messages.map((message) => messageElement(
+    message,
+    reactions.filter((reaction) => reaction.group_message_id === message.id)
+  )));
 }
 
 function subscribeToMessages() {
   if (messagesChannel || roomUnlockedUntil <= Date.now()) return;
   messagesChannel = supabase
     .channel("nexus09-room-messages", { config: { private: true } })
-    .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, async () => {
+    .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, async () => {
       try {
         await loadMessages();
       } catch (error) {
         console.error("Could not refresh NEXUS-09 messages.", error);
         showToast("A new message arrived but the channel could not refresh.");
+      }
+    })
+    .on("postgres_changes", { event: "*", schema: "public", table: "message_reactions" }, async () => {
+      try {
+        await loadMessages();
+      } catch (error) {
+        console.error("Could not refresh NEXUS-09 message reactions.", error);
+        showToast("Message reactions could not be refreshed.");
       }
     })
     .subscribe((status) => {
@@ -652,6 +713,7 @@ async function signOutMember() {
   roomUnlockedUntil = 0;
   window.clearTimeout(roomExpiryTimer);
   await removeRealtimeChannels();
+  await communityFeatures?.dispose();
   const { error } = await supabase.auth.signOut();
   if (error) {
     console.error("Could not sign out of NEXUS-09.", error);
@@ -679,6 +741,7 @@ async function start() {
       roomUnlockedUntil = 0;
       window.clearTimeout(roomExpiryTimer);
       void removeRealtimeChannels();
+      void communityFeatures?.dispose();
       appShell.hidden = true;
       authScreen.hidden = false;
       document.querySelector("#profileButton").hidden = true;

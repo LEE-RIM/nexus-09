@@ -77,6 +77,8 @@
         <button class="rail-button active" type="button" aria-label="Lab overview" title="Lab overview">⌂</button>
         <button class="rail-button" id="membersNav" type="button" aria-label="Members" title="Members">♙<i>24</i></button>
         <button class="rail-button" id="chatNav" type="button" aria-label="Group chat" title="Group chat">▤<b></b></button>
+        <button class="rail-button" id="dmNav" type="button" aria-label="Direct messages" title="Direct messages">✉</button>
+        <button class="rail-button" id="moderationNav" type="button" aria-label="Moderation reports" title="Moderation reports" hidden>⚑</button>
         <span class="rail-spacer"></span>
         <button class="rail-button invite-rail" id="inviteRail" type="button" aria-label="Invite a member" title="Invite a member">＋</button>
         <span class="rail-foot">V 0.1</span>
@@ -95,6 +97,14 @@
             <button class="outline-button" id="inviteButton" type="button"><span>＋</span> Invite member</button>
           </div>
         </div>
+
+        <section class="announcements-panel" aria-labelledby="announcementsTitle">
+          <div class="announcements-heading">
+            <div><p class="overline"><span class="tiny-dot"></span> FACILITY BULLETINS</p><h2 id="announcementsTitle">Announcements</h2></div>
+            <button class="secondary-button" id="newAnnouncementButton" type="button" hidden>POST UPDATE ＋</button>
+          </div>
+          <div class="announcements-list" id="announcementsList" aria-live="polite"><p class="feature-empty">Loading facility announcements…</p></div>
+        </section>
 
         <section class="lab-scene" aria-labelledby="sceneTitle">
           <div class="scene-topline"><span><i class="tiny-dot"></i> LIVE FACILITY VIEW</span><span>CAM 01 <b>●</b></span></div>
@@ -238,6 +248,7 @@
         <h2 id="memberName">Member name</h2>
         <p class="member-bio" id="memberBio"></p>
         <div class="member-meta"><span>ACCESS TIER <strong id="memberTier"></strong></span><span>STATUS <strong class="member-active"><i></i> ACTIVE</strong></span></div>
+        <button class="primary-button member-message-button" id="memberDmButton" type="button">SEND PRIVATE MESSAGE →</button>
       </div>
     </dialog>
 
@@ -252,6 +263,64 @@
         <button class="primary-button" id="generateInviteButton" type="button">GENERATE INVITE CODE <span>＋</span></button>
         <div class="generated-invite" id="generatedInvite" hidden><span>ONE-TIME DEMO INVITE</span><code id="inviteCode"></code><button class="secondary-button" id="copyInviteButton" type="button">COPY CODE</button></div>
         <p class="dialog-error" id="inviteError" role="status"></p>
+      </div>
+    </dialog>
+
+    <dialog class="app-dialog wide-dialog" id="directMessagesDialog">
+      <div class="dialog-shell content-shell">
+        <button class="dialog-close" data-close type="button" aria-label="Close dialog">×</button>
+        <p class="overline"><span class="tiny-dot"></span> MEMBER-TO-MEMBER <span class="slash">/</span> PRIVATE CHANNELS</p>
+        <h2>Direct messages <span class="channel-live"><i></i> PRIVATE</span></h2>
+        <div class="dm-layout">
+          <nav class="dm-conversations" id="dmConversationList" aria-label="Conversations"><p class="feature-empty">Loading conversations…</p></nav>
+          <section class="dm-thread-panel" aria-label="Direct message conversation">
+            <h3 id="dmConversationTitle">Choose a member to start a private conversation</h3>
+            <div class="chat-thread dm-thread" id="dmThread" aria-live="polite"></div>
+            <form class="chat-compose" id="dmForm"><label class="visually-hidden" for="dmInput">Write a private message</label><input id="dmInput" maxlength="500" autocomplete="off" placeholder="Send a private message…" disabled><button type="submit" aria-label="Send private message" disabled>↑</button></form>
+            <p class="chat-demo-note">Only the two participants can read messages here. Reporting a message shares its text with the facility owner for review.</p>
+          </section>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog class="app-dialog" id="announcementDialog">
+      <div class="dialog-shell">
+        <button class="dialog-close" data-close type="button" aria-label="Close dialog">×</button>
+        <p class="overline">FACILITY BULLETINS <span class="slash">/</span> OWNER POST</p>
+        <h2>Post an announcement.</h2>
+        <form class="dialog-form" id="announcementForm">
+          <label for="announcementTitleInput">TITLE (UP TO 120 CHARACTERS)</label>
+          <input class="dark-input" id="announcementTitleInput" maxlength="120" required>
+          <label for="announcementBodyInput">MESSAGE (UP TO 2000 CHARACTERS)</label>
+          <textarea class="dark-input" id="announcementBodyInput" maxlength="2000" rows="5" required></textarea>
+          <label class="feature-checkbox"><input id="announcementPinnedInput" type="checkbox"> PIN THIS ANNOUNCEMENT</label>
+          <button class="primary-button" type="submit">PUBLISH UPDATE →</button>
+        </form>
+        <p class="dialog-error" id="announcementError" role="status"></p>
+      </div>
+    </dialog>
+
+    <dialog class="app-dialog wide-dialog" id="moderationDialog">
+      <div class="dialog-shell content-shell">
+        <button class="dialog-close" data-close type="button" aria-label="Close dialog">×</button>
+        <p class="overline">FACILITY OPERATIONS <span class="slash">/</span> PRIVATE MODERATION</p>
+        <h2>Message reports <span class="channel-live"><i></i> OWNER ONLY</span></h2>
+        <div class="moderation-reports" id="moderationReports" aria-live="polite"><p class="feature-empty">Loading reports…</p></div>
+      </div>
+    </dialog>
+
+    <dialog class="app-dialog" id="reportDialog">
+      <div class="dialog-shell">
+        <button class="dialog-close" data-close type="button" aria-label="Close dialog">×</button>
+        <p class="overline">MEMBER SAFETY <span class="slash">/</span> REPORT MESSAGE</p>
+        <h2>Tell the owner what happened.</h2>
+        <p class="dialog-copy" id="reportMessagePreview"></p>
+        <form class="dialog-form" id="reportForm">
+          <label for="reportReason">REASON (UP TO 500 CHARACTERS)</label>
+          <textarea class="dark-input" id="reportReason" maxlength="500" rows="4" required></textarea>
+          <button class="primary-button" type="submit">SEND PRIVATE REPORT →</button>
+        </form>
+        <p class="dialog-error" id="reportError" role="status"></p>
       </div>
     </dialog>
 

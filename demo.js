@@ -39,6 +39,10 @@ let toastTimer;
 let labUnlocked = false;
 let roomUnlocked = false;
 let pendingDestination = null;
+document.querySelector(".announcements-panel").hidden = true;
+document.querySelector("#dmNav").hidden = true;
+document.querySelector("#moderationNav").hidden = true;
+document.querySelector("#memberDmButton").hidden = true;
 
 function loadChat() {
   try {
