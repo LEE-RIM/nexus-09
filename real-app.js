@@ -101,6 +101,19 @@ function setAuthTab(tab) {
 document.querySelector("#loginTab").addEventListener("click", () => setAuthTab("login"));
 document.querySelector("#joinTab").addEventListener("click", () => setAuthTab("join"));
 document.querySelector("#ownerTab").addEventListener("click", () => setAuthTab("owner"));
+document.querySelector("#vipOpenPowerRoom").addEventListener("click", () => {
+  if (["owner", "sub_owner"].includes(currentProfile?.role)) {
+    openDialog(document.querySelector("#roomsDialog"));
+    showToast("Private power room is ready.");
+    return;
+  }
+  showToast("Only the owner team can access the power room.");
+});
+document.querySelector("#saveOwnerNote").addEventListener("click", () => {
+  const note = document.querySelector("#vipOwnerNote").value.trim();
+  localStorage.setItem("nexus09-owner-note", note || "Leadership access remains active for the team.");
+  showToast("Owner note saved.");
+});
 
 function showAuthError(message) {
   authError.textContent = message;
@@ -404,6 +417,47 @@ function renderRoster(profiles) {
     return button;
   }));
   document.querySelector("#allMembersButton").disabled = members.length === 0;
+  renderVipSpotlight();
+}
+
+function renderVipSpotlight() {
+  const owner = profilesCache.find((profile) => profile.role === "owner");
+  const subOwner = profilesCache.find((profile) => profile.role === "sub_owner");
+  const ownerName = document.querySelector("#vipOwnerName");
+  const ownerMeta = document.querySelector("#vipOwnerMeta");
+  const ownerQuote = document.querySelector("#vipOwnerQuote");
+  const subOwnerName = document.querySelector("#vipSubOwnerName");
+  const subOwnerMeta = document.querySelector("#vipSubOwnerMeta");
+  const subOwnerQuote = document.querySelector("#vipSubOwnerQuote");
+  const noteInput = document.querySelector("#vipOwnerNote");
+  const saveButton = document.querySelector("#saveOwnerNote");
+  const ownerTeam = ["owner", "sub_owner"].includes(currentProfile?.role);
+
+  if (owner) {
+    ownerName.textContent = owner.display_name;
+    ownerMeta.textContent = `ID ${owner.handle.toUpperCase()} · MAIN OWNER`;
+    ownerQuote.textContent = "Leadership access is secure, and the room remains protected for the inner team.";
+  } else {
+    ownerName.textContent = "Main owner";
+    ownerMeta.textContent = "No owner assigned yet";
+    ownerQuote.textContent = "Leadership access secured for the inner facility.";
+  }
+
+  if (subOwner) {
+    subOwnerName.textContent = subOwner.display_name;
+    subOwnerMeta.textContent = `ID ${subOwner.handle.toUpperCase()} · SUB-OWNER`;
+    subOwnerQuote.textContent = "Operations and access routing are live for the VIP room.";
+  } else {
+    subOwnerName.textContent = "Sub-owner";
+    subOwnerMeta.textContent = "No sub-owner assigned yet";
+    subOwnerQuote.textContent = "Strategic access remains in standby until confirmed.";
+  }
+
+  const savedNote = localStorage.getItem("nexus09-owner-note");
+  noteInput.value = savedNote || "Leadership access remains active for the team. Keep updates crisp and secure.";
+  noteInput.disabled = !ownerTeam;
+  saveButton.disabled = !ownerTeam;
+  noteInput.setAttribute("aria-label", ownerTeam ? "Owner quick note" : "Owner quick note (owner-only)");
 }
 
 function showMember(member) {

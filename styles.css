@@ -167,6 +167,20 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .icon-button { display: grid; width: 27px; height: 27px; place-items: center; border: 1px solid var(--line); border-radius: 4px; background: transparent; color: #94a3ab; cursor: pointer; }
 .members-panel .section-top h2 span { margin-left: 5px; color: #73828b; font: 9px var(--mono); }
 .member-strip { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 7px; margin: 16px 0 14px; }
+.vip-panel { margin-top: 15px; padding: 19px; border: 1px solid rgb(255 210 105 / 20%); border-radius: 5px; background: linear-gradient(135deg, rgba(30, 22, 9, 0.96), rgba(14, 18, 23, 0.96)); }
+.vip-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
+.vip-card { min-width: 0; padding: 14px 15px; border: 1px solid rgba(255, 210, 105, 0.18); border-radius: 5px; background: rgba(255, 210, 105, 0.03); }
+.vip-card-sub-owner { border-color: rgba(174, 161, 255, 0.25); background: rgba(174, 161, 255, 0.04); }
+.vip-header { display: flex; align-items: center; gap: 10px; }
+.vip-header strong { display: block; color: #edf3f4; font: 500 12px var(--display); }
+.vip-header small { color: #84939c; font: 7px var(--mono); }
+.vip-card p { margin: 12px 0 0; color: #b8c5cc; font-size: 10px; line-height: 1.6; }
+.vip-open-button { border-color: rgba(255, 210, 105, 0.25); color: #ffe29a; }
+.vip-note-box { display: grid; gap: 8px; padding: 14px; border: 1px solid rgba(123, 228, 227, 0.18); border-radius: 5px; background: rgba(10, 18, 23, 0.7); }
+.vip-note-box label { color: #9aa8b0; font: 7px var(--mono); letter-spacing: .7px; }
+.vip-note-box textarea { width: 100%; min-height: 94px; resize: vertical; padding: 10px 11px; border: 1px solid rgba(123, 228, 227, 0.18); border-radius: 4px; background: rgba(8, 12, 16, 0.9); color: #edf3f4; font: 10px/1.5 "DM Sans", sans-serif; }
+.vip-note-box textarea::placeholder { color: #6d7f87; }
+.vip-note-box .outline-button { justify-self: end; }
 .member-mini { display: grid; min-width: 0; justify-items: center; gap: 5px; padding: 7px 3px; border: 1px solid transparent; border-radius: 4px; background: transparent; cursor: pointer; }
 .member-mini:hover { border-color: rgb(123 228 227 / 18%); background: rgb(123 228 227 / 5%); }
 .member-mini .avatar { width: 30px; height: 30px; font-size: 9px; }

@@ -166,6 +166,37 @@
             <div class="roster-foot"><span><i class="tiny-dot"></i> 24 ACTIVE CLEARANCES</span><button class="text-link" id="viewMembersButton" type="button">View roster <span>→</span></button></div>
           </article>
         </section>
+
+        <section class="vip-panel" id="vipPanel" aria-live="polite">
+          <div class="section-top"><div><p class="overline">OWNER TEAM</p><h2>VIP spotlight</h2></div><button class="secondary-button vip-open-button" id="vipOpenPowerRoom" type="button">OPEN POWER ROOM</button></div>
+          <div class="vip-grid">
+            <article class="vip-card vip-card-owner">
+              <div class="vip-header">
+                <span class="avatar avatar-main-owner" id="vipOwnerAvatar">👑</span>
+                <div>
+                  <strong id="vipOwnerName">Main owner</strong>
+                  <small id="vipOwnerMeta">No owner assigned yet</small>
+                </div>
+              </div>
+              <p id="vipOwnerQuote">Leadership access secured for the inner facility.</p>
+            </article>
+            <article class="vip-card vip-card-sub-owner">
+              <div class="vip-header">
+                <span class="avatar avatar-sub-owner" id="vipSubOwnerAvatar">◆</span>
+                <div>
+                  <strong id="vipSubOwnerName">Sub-owner</strong>
+                  <small id="vipSubOwnerMeta">No sub-owner assigned yet</small>
+                </div>
+              </div>
+              <p id="vipSubOwnerQuote">Strategic access remains in standby until confirmed.</p>
+            </article>
+            <div class="vip-note-box">
+              <label for="vipOwnerNote">Owner quick note</label>
+              <textarea id="vipOwnerNote" rows="4" maxlength="180" placeholder="Ship the next briefing before the end of the day."></textarea>
+              <button class="outline-button" id="saveOwnerNote" type="button">SAVE NOTE</button>
+            </div>
+          </div>
+        </section>
         <footer class="workspace-footer"><span>NEXUS-09 <b>·</b> PRIVATE BY INVITATION</span><span>A PLACE FOR THE CURIOUS <b>✳</b></span></footer>
       </section>
     </main>
