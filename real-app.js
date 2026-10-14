@@ -238,7 +238,8 @@ async function initializeMember(user) {
     document.querySelector("#profileButton").hidden = false;
     document.querySelector(".heading-row h1 em").textContent = profile.display_name + ".";
     document.querySelector("#profileButton strong").textContent = profile.display_name.toUpperCase();
-    document.querySelector("#profileButton small").textContent = `ID ${profile.handle.toUpperCase()} · ${profile.role.toUpperCase()}`;
+    document.querySelector("#profileButton small").textContent =
+      `ID ${profile.handle.toUpperCase()} · ${profile.role.replace("_", " ").toUpperCase()}`;
     document.querySelector("#profileButton .avatar").textContent = profile.display_name.trim().charAt(0).toUpperCase();
     document.querySelector("#profileButton").setAttribute("aria-label", "Account options for " + profile.display_name);
     const topbar = document.querySelector(".topbar");
@@ -260,7 +261,13 @@ async function initializeMember(user) {
         getCurrentProfile: () => currentProfile,
         getMembers: () => profilesCache,
         showToast,
-        openDialog
+        openDialog,
+        refreshMembers: loadRoster,
+        updateCurrentProfile: (updatedProfile) => {
+          currentProfile = updatedProfile;
+          document.querySelector("#profileButton small").textContent =
+            `ID ${updatedProfile.handle.toUpperCase()} · ${updatedProfile.role.replace("_", " ").toUpperCase()}`;
+        }
       });
     }
     await communityFeatures.initialize(profile);
@@ -283,6 +290,13 @@ async function loadRoster() {
   }
   const roster = data || [];
   profilesCache = roster;
+  const updatedCurrentProfile = roster.find((profile) => profile.id === currentProfile?.id);
+  if (updatedCurrentProfile && updatedCurrentProfile.role !== currentProfile.role) {
+    currentProfile = updatedCurrentProfile;
+    document.querySelector("#profileButton small").textContent =
+      `ID ${currentProfile.handle.toUpperCase()} · ${currentProfile.role.replace("_", " ").toUpperCase()}`;
+    if (communityFeatures) await communityFeatures.initialize(currentProfile);
+  }
   const total = count ?? roster.length;
   document.querySelector("#memberCount").textContent = String(total).padStart(2, "0");
   document.querySelector("#rosterCount").textContent = String(total);
@@ -295,7 +309,7 @@ async function loadRoster() {
   renderRoster(roster);
   if (communityFeatures) {
     await communityFeatures.loadConversations();
-    if (currentProfile?.role === "owner") await communityFeatures.loadReports();
+    if (["owner", "sub_owner"].includes(currentProfile?.role)) await communityFeatures.loadReports();
   }
 }
 
@@ -305,11 +319,26 @@ function toMember(profile) {
     id: profile.handle,
     userId: profile.id,
     name: profile.display_name,
-    role: profile.role === "owner" ? "Facility owner" : "NEXUS-09 member",
-    tier: profile.role === "owner" ? "OWNER" : "MEMBER",
+    accountRole: profile.role,
+    role: profile.role === "owner"
+      ? "Main owner"
+      : profile.role === "sub_owner"
+        ? "Sub-owner"
+        : "NEXUS-09 member",
+    tier: profile.role === "owner"
+      ? "MAIN OWNER"
+      : profile.role === "sub_owner"
+        ? "SUB-OWNER"
+        : "MEMBER",
     bio: `NEXUS-09 member since ${new Intl.DateTimeFormat("en", { month: "short", year: "numeric" }).format(new Date(profile.created_at))}.`,
     initials: profile.display_name.trim().charAt(0).toUpperCase(),
-    color: colors[Array.from(profile.handle).reduce((sum, char) => sum + char.charCodeAt(0), 0) % colors.length],
+    color: profile.role === "owner"
+      ? "main-owner"
+      : profile.role === "sub_owner"
+        ? "sub-owner"
+        : colors[Array.from(profile.handle).reduce((sum, char) => sum + char.charCodeAt(0), 0) % colors.length],
+    roleClass: profile.role === "owner" ? "is-main-owner" : profile.role === "sub_owner" ? "is-sub-owner" : "",
+    badge: profile.role === "owner" ? "✦ MAIN OWNER" : profile.role === "sub_owner" ? "◆ SUB-OWNER" : "",
     online: profile.id === currentProfile?.id
   };
 }
@@ -319,7 +348,7 @@ function renderRoster(profiles) {
   const strip = document.querySelector("#memberStrip");
   strip.replaceChildren(...members.slice(0, 8).map((member) => {
     const button = document.createElement("button");
-    button.className = "member-mini";
+    button.className = `member-mini ${member.roleClass}`;
     button.type = "button";
     button.setAttribute("aria-label", `View ID card for ${member.name}`);
     const avatar = document.createElement("span");
@@ -328,13 +357,19 @@ function renderRoster(profiles) {
     const name = document.createElement("span");
     name.textContent = member.name;
     button.append(avatar, name);
+    if (member.badge) {
+      const badge = document.createElement("small");
+      badge.className = "member-role-badge";
+      badge.textContent = member.badge;
+      button.append(badge);
+    }
     button.addEventListener("click", () => showMember(member));
     return button;
   }));
   const grid = document.querySelector("#rosterGrid");
   grid.replaceChildren(...members.map((member) => {
     const button = document.createElement("button");
-    button.className = "roster-card";
+    button.className = `roster-card ${member.roleClass}`;
     button.type = "button";
     const avatar = document.createElement("span");
     avatar.className = `avatar avatar-${member.color}`;
@@ -346,8 +381,18 @@ function renderRoster(profiles) {
     id.textContent = `ID ${member.id}`;
     const status = document.createElement("small");
     status.className = "online-tag";
-    status.textContent = member.role === "Facility owner" ? "FACILITY OWNER" : "CLEARED MEMBER";
+    status.textContent = member.role === "Main owner"
+      ? "MAIN OWNER"
+      : member.role === "Sub-owner"
+        ? "SUB-OWNER"
+        : "CLEARED MEMBER";
     details.append(name, id, status);
+    if (member.badge) {
+      const badge = document.createElement("small");
+      badge.className = "member-role-badge";
+      badge.textContent = member.badge;
+      details.append(badge);
+    }
     button.append(avatar, details);
     button.addEventListener("click", () => showMember(member));
     return button;
@@ -362,13 +407,24 @@ function showMember(member) {
   avatar.textContent = member.initials;
   const copy = document.createElement("span");
   copy.className = "large-id-copy";
+  const card = document.querySelector("#largeIdCard");
+  card.classList.toggle("is-main-owner", member.accountRole === "owner");
+  card.classList.toggle("is-sub-owner", member.accountRole === "sub_owner");
   const name = document.createElement("strong");
   name.textContent = member.name.toUpperCase();
   const role = document.createElement("span");
   role.textContent = member.role.toUpperCase();
+  if (member.badge) {
+    const badge = document.createElement("span");
+    badge.className = "member-role-badge";
+    badge.textContent = member.badge;
+    copy.append(name, role, badge);
+  } else {
+    copy.append(name, role);
+  }
   const id = document.createElement("small");
   id.textContent = `NEXUS-09 · ID ${member.id.toUpperCase()}`;
-  copy.append(name, role, id);
+  copy.append(id);
   document.querySelector("#largeIdCard").append(avatar, copy);
   document.querySelector("#memberName").textContent = member.name;
   document.querySelector("#memberBio").textContent = member.bio;
@@ -389,7 +445,7 @@ function subscribePresence() {
       const online = Object.keys(presenceChannel.presenceState()).length;
       document.querySelector("#onlineCount").textContent = String(online).padStart(2, "0");
     })
-    .on("postgres_changes", { event: "INSERT", schema: "public", table: "profiles" }, () => {
+    .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => {
       loadRoster().catch((error) => {
         console.error("Could not refresh the NEXUS-09 member roster.", error);
         showToast("A new member joined, but the roster could not refresh.");
@@ -506,9 +562,17 @@ document.querySelector("#accessForm").addEventListener("submit", async (event) =
 function messageElement(message, reactions = []) {
   const profile = message.profiles || {};
   const own = message.sender_id === currentProfile?.id;
-  const color = own ? "cyan" : ["violet", "amber", "rose", "blue", "green"][Array.from(profile.handle || "").reduce((sum, char) => sum + char.charCodeAt(0), 0) % 5];
+  const role = profile.role || "member";
+  const roleClass = role === "owner" ? "is-main-owner" : role === "sub_owner" ? "is-sub-owner" : "";
+  const color = role === "owner"
+    ? "main-owner"
+    : role === "sub_owner"
+      ? "sub-owner"
+      : own
+        ? "cyan"
+        : ["violet", "amber", "rose", "blue", "green"][Array.from(profile.handle || "").reduce((sum, char) => sum + char.charCodeAt(0), 0) % 5];
   const item = document.createElement("article");
-  item.className = `chat-message${own ? " is-you" : ""}`;
+  item.className = `chat-message${own ? " is-you" : ""}${roleClass ? ` ${roleClass}` : ""}`;
   const avatar = document.createElement("span");
   avatar.className = `avatar avatar-${color}`;
   avatar.textContent = (profile.display_name || "M").trim().charAt(0).toUpperCase();
@@ -518,13 +582,21 @@ function messageElement(message, reactions = []) {
   heading.className = "chat-message-heading";
   const name = document.createElement("strong");
   name.textContent = profile.display_name || "NEXUS member";
+  if (roleClass) {
+    const badge = document.createElement("span");
+    badge.className = "chat-role-badge";
+    badge.textContent = role === "owner" ? "✦ MAIN OWNER" : "◆ SUB-OWNER";
+    heading.append(name, badge);
+  } else {
+    heading.append(name);
+  }
   const time = document.createElement("time");
   const date = new Date(message.created_at);
   time.dateTime = date.toISOString();
   time.textContent = new Intl.DateTimeFormat("en", { hour: "2-digit", minute: "2-digit" }).format(date);
   const body = document.createElement("p");
   body.textContent = message.body;
-  heading.append(name, time);
+  heading.append(time);
   copy.append(heading, body);
   addReactionControls(copy, {
     supabase,
@@ -563,7 +635,7 @@ async function loadMessages() {
   if (roomUnlockedUntil <= Date.now()) throw new Error("Room access expired. Enter the code again.");
   const { data, error } = await supabase
     .from("messages")
-    .select("id,body,created_at,sender_id,profiles!messages_sender_id_fkey(display_name,handle)")
+    .select("id,body,created_at,sender_id,profiles!messages_sender_id_fkey(display_name,handle,role)")
     .order("id", { ascending: false })
     .limit(100);
   if (error) throw error;

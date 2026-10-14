@@ -105,7 +105,7 @@ export function addReportButton(container, { kind, messageId, body, openReport }
   button.type = "button";
   button.className = "message-report-button";
   button.textContent = "Report";
-  button.setAttribute("aria-label", "Report this message to the facility owner");
+  button.setAttribute("aria-label", "Report this message to the owner team");
   button.addEventListener("click", () => openReport({ kind, messageId, body }));
   container.append(button);
 }
@@ -120,10 +120,11 @@ function isOneGrapheme(value) {
 }
 
 export function initCommunityFeatures({
-  supabase, getCurrentProfile, getMembers, showToast, openDialog
+  supabase, getCurrentProfile, getMembers, showToast, openDialog, refreshMembers, updateCurrentProfile
 }) {
   let initializedFor;
   let activeDirectConversation;
+  let initializedRole;
   let directChannel;
   let directInboxChannel;
   let announcementsChannel;
@@ -143,6 +144,7 @@ export function initCommunityFeatures({
 
     document.querySelector("#dmNav").addEventListener("click", openDirectMessages);
     document.querySelector("#moderationNav").addEventListener("click", openModeration);
+    document.querySelector("#ownershipNav").addEventListener("click", openOwnership);
     document.querySelector("#newAnnouncementButton").addEventListener("click", () => {
       document.querySelector("#announcementForm").reset();
       document.querySelector("#announcementError").textContent = "";
@@ -155,6 +157,9 @@ export function initCommunityFeatures({
     });
     document.querySelector("#dmForm").addEventListener("submit", sendDirectMessage);
     document.querySelector("#reportForm").addEventListener("submit", submitReport);
+    document.querySelector("#subOwnerForm").addEventListener("submit", appointSubOwner);
+    document.querySelector("#transferSecretForm").addEventListener("submit", saveTransferSecret);
+    document.querySelector("#ownershipTransferForm").addEventListener("submit", transferOwnership);
     document.querySelector("#reportDialog").addEventListener("close", () => {
       reportTarget = null;
       document.querySelector("#reportReason").value = "";
@@ -166,16 +171,161 @@ export function initCommunityFeatures({
 
   async function initialize(profile) {
     bindEvents();
-    if (!profile || initializedFor === profile.id) return;
+    document.querySelector("#newAnnouncementButton").hidden =
+      !["owner", "sub_owner"].includes(profile?.role);
+    document.querySelector("#moderationNav").hidden =
+      !["owner", "sub_owner"].includes(profile?.role);
+    document.querySelector("#ownershipNav").hidden = profile?.role !== "owner";
+    if (!profile) return;
+    if (initializedFor === profile.id) {
+      if (initializedRole === profile.role) return;
+      initializedRole = profile.role;
+      await loadAnnouncements();
+      if (["owner", "sub_owner"].includes(profile.role)) {
+        await loadReports();
+        subscribeReports();
+      } else if (reportsChannel) {
+        const channel = reportsChannel;
+        reportsChannel = null;
+        const status = await supabase.removeChannel(channel);
+        if (status !== "ok") console.error("Could not close the NEXUS-09 moderation channel.", status);
+        reportList.replaceChildren(featureMessage("Reports are available to the owner team."));
+      }
+      return;
+    }
     initializedFor = profile.id;
-    document.querySelector("#newAnnouncementButton").hidden = profile.role !== "owner";
-    document.querySelector("#moderationNav").hidden = profile.role !== "owner";
+    initializedRole = profile.role;
     await loadAnnouncements();
     subscribeAnnouncements();
     subscribeDirectInbox(profile);
-    if (profile.role === "owner") {
+    if (["owner", "sub_owner"].includes(profile.role)) {
       await loadReports();
       subscribeReports();
+    }
+  }
+
+  function populateOwnershipSelects() {
+    const profile = getCurrentProfile();
+    const members = getMembers().filter((member) => member.id !== profile?.id);
+    const subOwnerSelect = document.querySelector("#subOwnerSelect");
+    const transferOwnerSelect = document.querySelector("#transferOwnerSelect");
+    const currentSubOwner = members.find((member) => member.role === "sub_owner");
+    subOwnerSelect.replaceChildren(new Option("No sub-owner", ""));
+    transferOwnerSelect.replaceChildren(new Option("Choose a member", ""));
+    for (const member of members) {
+      const label = `${member.display_name} · ${member.handle}${member.role === "sub_owner" ? " · CURRENT SUB-OWNER" : ""}`;
+      const subOwnerOption = new Option(label, member.id);
+      subOwnerOption.selected = member.role === "sub_owner";
+      subOwnerSelect.add(subOwnerOption);
+      transferOwnerSelect.add(new Option(label, member.id));
+    }
+    document.querySelector("#currentSubOwnerStatus").textContent = currentSubOwner
+      ? `Current sub-owner: ${currentSubOwner.display_name} (@${currentSubOwner.handle})`
+      : "No sub-owner is appointed.";
+  }
+
+  async function openOwnership() {
+    if (getCurrentProfile()?.role !== "owner") return;
+    populateOwnershipSelects();
+    document.querySelector("#subOwnerError").textContent = "";
+    document.querySelector("#transferSecretError").textContent = "";
+    document.querySelector("#ownershipTransferError").textContent = "";
+    openDialog(document.querySelector("#ownershipDialog"));
+  }
+
+  async function callOwnershipFunction(payload) {
+    const { data, error } = await supabase.functions.invoke("manage-ownership", { body: payload });
+    if (error || data?.error) {
+      let message = data?.error;
+      if (!message && error?.context instanceof Response) {
+        try {
+          const response = await error.context.clone().json();
+          if (typeof response?.error === "string") message = response.error;
+        } catch (parseError) {
+          console.error("Could not read the ownership function response.", parseError);
+        }
+      }
+      throw new Error(message || error?.message || "Ownership settings could not be updated.");
+    }
+    return data;
+  }
+
+  async function appointSubOwner(event) {
+    event.preventDefault();
+    const errorBox = document.querySelector("#subOwnerError");
+    const button = event.currentTarget.querySelector('button[type="submit"]');
+    errorBox.textContent = "";
+    button.disabled = true;
+    try {
+      await callOwnershipFunction({
+        action: "appoint_subowner",
+        memberId: document.querySelector("#subOwnerSelect").value
+      });
+      await refreshMembers();
+      populateOwnershipSelects();
+      showToast("Sub-owner appointment updated.");
+    } catch (error) {
+      console.error("Could not update the NEXUS-09 sub-owner.", error);
+      errorBox.textContent = error.message || "The sub-owner could not be updated.";
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  async function saveTransferSecret(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const errorBox = document.querySelector("#transferSecretError");
+    const button = form.querySelector('button[type="submit"]');
+    errorBox.textContent = "";
+    button.disabled = true;
+    try {
+      await callOwnershipFunction({
+        action: "set_transfer_secret",
+        newSecret: document.querySelector("#newTransferSecret").value,
+        confirmSecret: document.querySelector("#confirmTransferSecret").value,
+        currentSecret: document.querySelector("#currentTransferSecret").value || undefined
+      });
+      form.reset();
+      showToast("Ownership transfer secret saved.");
+    } catch (error) {
+      console.error("Could not save the ownership transfer secret.", error);
+      errorBox.textContent = error.message || "The transfer secret could not be saved.";
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  async function transferOwnership(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const errorBox = document.querySelector("#ownershipTransferError");
+    const button = form.querySelector('button[type="submit"]');
+    errorBox.textContent = "";
+    if (document.querySelector("#confirmTransferText").value !== "TRANSFER") {
+      errorBox.textContent = 'Type "TRANSFER" to confirm this permanent ownership change.';
+      return;
+    }
+    if (!window.confirm("Transfer main ownership now? You will become the sub-owner.")) return;
+    button.disabled = true;
+    try {
+      await callOwnershipFunction({
+        action: "transfer_ownership",
+        memberId: document.querySelector("#transferOwnerSelect").value,
+        transferSecret: document.querySelector("#ownershipTransferSecret").value
+      });
+      form.reset();
+      const updatedProfile = { ...getCurrentProfile(), role: "sub_owner" };
+      updateCurrentProfile(updatedProfile);
+      await refreshMembers();
+      await initialize(updatedProfile);
+      document.querySelector("#ownershipDialog").close();
+      showToast("Ownership transferred. You are now the sub-owner.");
+    } catch (error) {
+      console.error("Could not complete the NEXUS-09 ownership transfer.", error);
+      errorBox.textContent = error.message || "Ownership could not be transferred.";
+    } finally {
+      button.disabled = false;
     }
   }
 
@@ -210,7 +360,7 @@ export function initCommunityFeatures({
       const body = document.createElement("p");
       body.textContent = announcement.body;
       article.append(header, body);
-      if (profile?.role === "owner") {
+      if (["owner", "sub_owner"].includes(profile?.role)) {
         const actions = document.createElement("div");
         actions.className = "announcement-actions";
         const pin = featureButton(announcement.pinned ? "Unpin" : "Pin", async () => {
@@ -269,7 +419,7 @@ export function initCommunityFeatures({
   async function publishAnnouncement(event) {
     event.preventDefault();
     const profile = getCurrentProfile();
-    if (profile?.role !== "owner") return;
+    if (!["owner", "sub_owner"].includes(profile?.role)) return;
     const form = event.currentTarget;
     const button = form.querySelector('button[type="submit"]');
     const errorBox = document.querySelector("#announcementError");
@@ -390,7 +540,7 @@ export function initCommunityFeatures({
     if (!activeDirectConversation || !profile) return;
     const { data, error } = await supabase
       .from("direct_messages")
-      .select("id,conversation_id,sender_id,body,created_at,profiles!direct_messages_sender_id_fkey(display_name,handle)")
+      .select("id,conversation_id,sender_id,body,created_at,profiles!direct_messages_sender_id_fkey(display_name,handle,role)")
       .eq("conversation_id", activeDirectConversation)
       .order("id", { ascending: false })
       .limit(100);
@@ -492,7 +642,7 @@ export function initCommunityFeatures({
       });
       if (error) throw error;
       document.querySelector("#reportDialog").close();
-      showToast("Report sent privately to the facility owner.");
+      showToast("Report sent privately to the owner team.");
     } catch (error) {
       console.error("Could not submit a NEXUS-09 message report.", error);
       errorBox.textContent = "Report could not be sent. Check your room access and try again.";
@@ -502,7 +652,7 @@ export function initCommunityFeatures({
   }
 
   async function openModeration() {
-    if (getCurrentProfile()?.role !== "owner") return;
+    if (!["owner", "sub_owner"].includes(getCurrentProfile()?.role)) return;
     await loadReports();
     openDialog(document.querySelector("#moderationDialog"));
   }
@@ -522,7 +672,7 @@ export function initCommunityFeatures({
   }
 
   async function loadReports() {
-    if (getCurrentProfile()?.role !== "owner") return;
+    if (!["owner", "sub_owner"].includes(getCurrentProfile()?.role)) return;
     const { data, error } = await supabase
       .from("message_reports")
       .select("id,reporter_id,report_kind,group_message_id,direct_message_id,reported_sender_id,reported_body,reason,status,created_at")
@@ -607,12 +757,12 @@ export function initCommunityFeatures({
       return;
     }
     if (!await reviewReport(report, "reviewed")) return;
-    showToast("Message removed; the report remains available to the owner.");
+    showToast("Message removed; the report remains available to the owner team.");
   }
 
   async function muteReportedMember(report, durationSeconds) {
     const sender = getMembers().find((member) => member.id === report.reported_sender_id);
-    if (!sender || sender.role === "owner") return;
+    if (!sender || ["owner", "sub_owner"].includes(sender.role)) return;
     const { error } = await supabase.rpc("mute_facility_member", {
       p_member_id: sender.id,
       p_duration_seconds: durationSeconds,
@@ -629,6 +779,7 @@ export function initCommunityFeatures({
 
   async function dispose() {
     initializedFor = null;
+    initializedRole = null;
     activeDirectConversation = null;
     const channels = [directChannel, directInboxChannel, announcementsChannel, reportsChannel].filter(Boolean);
     directChannel = null;
@@ -637,6 +788,7 @@ export function initCommunityFeatures({
     reportsChannel = null;
     document.querySelector("#newAnnouncementButton").hidden = true;
     document.querySelector("#moderationNav").hidden = true;
+    document.querySelector("#ownershipNav").hidden = true;
     document.querySelector("#dmInput").disabled = true;
     document.querySelector("#dmForm button").disabled = true;
     for (const channel of channels) {
@@ -652,6 +804,7 @@ export function initCommunityFeatures({
     loadDirectMessages,
     loadReports,
     openReport,
+    openOwnership,
     dispose
   };
 }
@@ -659,9 +812,17 @@ export function initCommunityFeatures({
 function createMessageElement(message, currentProfile) {
   const profile = message.profiles || {};
   const own = message.sender_id === currentProfile.id;
-  const color = own ? "cyan" : ["violet", "amber", "rose", "blue", "green"][Array.from(profile.handle || "").reduce((sum, char) => sum + char.charCodeAt(0), 0) % 5];
+  const role = profile.role || "member";
+  const roleClass = role === "owner" ? "is-main-owner" : role === "sub_owner" ? "is-sub-owner" : "";
+  const color = role === "owner"
+    ? "main-owner"
+    : role === "sub_owner"
+      ? "sub-owner"
+      : own
+        ? "cyan"
+        : ["violet", "amber", "rose", "blue", "green"][Array.from(profile.handle || "").reduce((sum, char) => sum + char.charCodeAt(0), 0) % 5];
   const item = document.createElement("article");
-  item.className = `chat-message${own ? " is-you" : ""}`;
+  item.className = `chat-message${own ? " is-you" : ""}${roleClass ? ` ${roleClass}` : ""}`;
   const avatar = document.createElement("span");
   avatar.className = `avatar avatar-${color}`;
   avatar.textContent = (profile.display_name || "M").trim().charAt(0).toUpperCase();
@@ -671,13 +832,21 @@ function createMessageElement(message, currentProfile) {
   heading.className = "chat-message-heading";
   const name = document.createElement("strong");
   name.textContent = profile.display_name || "NEXUS member";
+  if (roleClass) {
+    const badge = document.createElement("span");
+    badge.className = "chat-role-badge";
+    badge.textContent = role === "owner" ? "✦ MAIN OWNER" : "◆ SUB-OWNER";
+    heading.append(name, badge);
+  } else {
+    heading.append(name);
+  }
   const time = document.createElement("time");
   const date = new Date(message.created_at);
   time.dateTime = date.toISOString();
   time.textContent = new Intl.DateTimeFormat("en", { hour: "2-digit", minute: "2-digit" }).format(date);
   const body = document.createElement("p");
   body.textContent = message.body;
-  heading.append(name, time);
+  heading.append(time);
   copy.append(heading, body);
   item.append(avatar, copy);
   return item;

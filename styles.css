@@ -49,6 +49,8 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .profile-chip small { color: var(--muted); font: 7px var(--mono); }
 .profile-chevron { margin-left: 5px; color: #76848d; }
 .avatar { display: grid; width: 30px; height: 30px; flex: 0 0 auto; place-items: center; border: 1px solid rgb(123 228 227 / 35%); border-radius: 4px; background: linear-gradient(145deg, #263b41, #141f28); color: var(--cyan); font: 600 11px var(--display); }
+.avatar-main-owner { border-color: rgb(255 210 105 / 85%); background: linear-gradient(145deg, #6c5423, #292012); color: #ffe29a; box-shadow: 0 0 13px rgb(255 205 95 / 20%); }
+.avatar-sub-owner { border-color: rgb(157 148 255 / 75%); background: linear-gradient(145deg, #39365f, #1b1a32); color: #c1baff; box-shadow: 0 0 11px rgb(142 129 255 / 15%); }
 .demo-banner { padding: 8px 20px; border-bottom: 1px solid rgb(255 189 118 / 13%); background: rgb(255 189 118 / 4%); color: #988b7e; font: 8px var(--mono); letter-spacing: .35px; text-align: center; }
 .demo-banner span { margin-right: 8px; color: var(--amber); font-weight: 500; letter-spacing: 1px; }
 
@@ -168,6 +170,11 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .member-mini:hover { border-color: rgb(123 228 227 / 18%); background: rgb(123 228 227 / 5%); }
 .member-mini .avatar { width: 30px; height: 30px; font-size: 9px; }
 .member-mini span:last-child { max-width: 100%; overflow: hidden; color: #7d8a92; font: 6px var(--mono); text-overflow: ellipsis; white-space: nowrap; }
+.member-mini > span:nth-child(2) { max-width: 100%; overflow: hidden; color: #7d8a92; font: 6px var(--mono); text-overflow: ellipsis; white-space: nowrap; }
+.member-mini.is-main-owner { border-color: rgb(255 210 105 / 23%); background: rgb(255 210 105 / 4%); }
+.member-mini.is-sub-owner { border-color: rgb(157 148 255 / 23%); background: rgb(157 148 255 / 4%); }
+.member-role-badge { color: #ffdf8b !important; font: 6px var(--mono) !important; letter-spacing: .55px; }
+.is-sub-owner .member-role-badge { color: #beb6ff !important; }
 .roster-foot { display: flex; align-items: center; justify-content: space-between; padding-top: 11px; border-top: 1px solid var(--line); }
 .roster-foot > span { display: flex; align-items: center; gap: 7px; color: #71808a; font: 6px var(--mono); letter-spacing: .35px; }
 .roster-foot .tiny-dot { width: 5px; height: 5px; }
@@ -250,6 +257,12 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .chat-message-copy { min-width: 0; }
 .chat-message-heading { display: flex; align-items: baseline; gap: 7px; }
 .chat-message-heading strong { color: #c8d7d9; font: 8px var(--mono); }
+.chat-role-badge { color: #ffdf8b; font: 6px var(--mono); letter-spacing: .45px; white-space: nowrap; }
+.is-sub-owner .chat-role-badge { color: #beb6ff; }
+.chat-message.is-main-owner { padding: 7px; margin: -7px; border: 1px solid rgb(255 210 105 / 18%); border-radius: 4px; background: linear-gradient(100deg, rgb(255 210 105 / 5%), transparent 75%); }
+.chat-message.is-sub-owner { padding: 7px; margin: -7px; border: 1px solid rgb(157 148 255 / 17%); border-radius: 4px; background: linear-gradient(100deg, rgb(157 148 255 / 5%), transparent 75%); }
+.chat-message.is-main-owner .chat-message-heading strong { color: #ffe29a; }
+.chat-message.is-sub-owner .chat-message-heading strong { color: #c4bdff; }
 .chat-message-heading time { color: #63717b; font: 6px var(--mono); }
 .chat-message-copy p { margin: 4px 0 0; color: #a0aaae; font-size: 9px; line-height: 1.55; overflow-wrap: anywhere; }
 .chat-message.is-you .chat-message-heading strong { color: var(--cyan); }
@@ -305,6 +318,12 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .feature-checkbox { display: flex; align-items: center; gap: 8px; color: #8b9aa0; font: 7px var(--mono); }
 .feature-checkbox input { accent-color: #7be4e3; }
 .member-message-button { width: 100%; margin-top: 15px; }
+.ownership-shell { max-height: min(88vh, 850px); overflow: auto; }
+.ownership-section { margin-top: 21px; padding-top: 16px; border-top: 1px solid var(--line); }
+.ownership-section h3 { margin: 0 0 7px; color: #dce6e7; font: 500 14px var(--display); }
+.ownership-section .dialog-copy { margin: 0 0 12px; }
+.ownership-section .primary-button { width: 100%; margin-top: 12px; }
+.ownership-section .dialog-error { min-height: 0; margin: 8px 0 0; }
 .dialog-form textarea.dark-input { min-height: 88px; padding: 10px; resize: vertical; }
 .roster-limit { margin-left: auto; color: #73828b; font: 8px var(--mono); }
 .roster-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; max-height: 390px; margin: 17px 0; padding: 2px; overflow: auto; }
@@ -315,16 +334,28 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .roster-card strong { overflow: hidden; color: #c6d2d5; font: 7px var(--mono); text-overflow: ellipsis; white-space: nowrap; }
 .roster-card small { color: #73818a; font: 6px var(--mono); }
 .roster-card .online-tag { color: #81d5a0; }
+.roster-card.is-main-owner { border-color: rgb(255 210 105 / 32%); background: linear-gradient(145deg, rgb(108 84 35 / 30%), #10171d); }
+.roster-card.is-sub-owner { border-color: rgb(157 148 255 / 30%); background: linear-gradient(145deg, rgb(57 54 95 / 30%), #10171d); }
+.roster-card.is-main-owner strong { color: #ffe29a; }
+.roster-card.is-sub-owner strong { color: #c4bdff; }
 .roster-invite { width: auto; min-width: 185px; }
 .member-shell .dialog-mark { margin-top: 3px; }
 .member-shell h2 { margin-bottom: 6px; }
 .id-card-large { position: relative; display: flex; min-height: 131px; align-items: center; gap: 17px; margin-bottom: 23px; padding: 17px; overflow: hidden; border: 1px solid rgb(123 228 227 / 26%); border-radius: 5px; background: linear-gradient(115deg, #192a31, #111b22 65%, #18292a); }
+.id-card-large.is-main-owner { border-color: rgb(255 210 105 / 62%); background: linear-gradient(115deg, #443719, #211b12 65%, #362b16); box-shadow: inset 0 0 32px rgb(255 210 105 / 7%), 0 0 22px rgb(255 210 105 / 8%); }
+.id-card-large.is-sub-owner { border-color: rgb(157 148 255 / 58%); background: linear-gradient(115deg, #302e50, #171725 65%, #27233f); box-shadow: inset 0 0 32px rgb(157 148 255 / 6%), 0 0 22px rgb(157 148 255 / 7%); }
+.id-card-large.is-main-owner::after { border-color: rgb(255 210 105 / 27%); }
+.id-card-large.is-sub-owner::after { border-color: rgb(157 148 255 / 25%); }
 .id-card-large::after { position: absolute; top: -60px; right: -31px; width: 145px; height: 220px; border: 1px solid rgb(123 228 227 / 13%); transform: rotate(39deg); content: ""; }
 .large-id-avatar { display: grid; width: 61px; height: 71px; flex: 0 0 auto; place-items: center; border: 1px solid rgb(123 228 227 / 40%); border-radius: 4px; background: linear-gradient(145deg, #294047, #152129); color: var(--cyan); font: 500 24px var(--display); }
 .large-id-copy { display: grid; gap: 6px; }
 .large-id-copy strong { color: #ebf0f0; font: 500 13px var(--display); }
 .large-id-copy span { color: #88aaa9; font: 7px var(--mono); letter-spacing: .6px; }
 .large-id-copy small { color: #71828b; font: 6px var(--mono); }
+.id-card-large.is-main-owner .large-id-copy strong { color: #ffe29a; }
+.id-card-large.is-main-owner .large-id-copy > span:not(.member-role-badge) { color: #d5b767; }
+.id-card-large.is-sub-owner .large-id-copy strong { color: #d4cfff; }
+.id-card-large.is-sub-owner .large-id-copy > span:not(.member-role-badge) { color: #b1aaff; }
 .member-bio { color: #98a4a8; font-size: 10px; line-height: 1.7; }
 .member-meta { display: grid; grid-template-columns: 1fr 1fr; margin-top: 17px; padding-top: 14px; border-top: 1px solid var(--line); }
 .member-meta > span { display: grid; gap: 5px; color: #73828a; font: 6px var(--mono); letter-spacing: .5px; }

@@ -79,6 +79,7 @@
         <button class="rail-button" id="chatNav" type="button" aria-label="Group chat" title="Group chat">▤<b></b></button>
         <button class="rail-button" id="dmNav" type="button" aria-label="Direct messages" title="Direct messages">✉</button>
         <button class="rail-button" id="moderationNav" type="button" aria-label="Moderation reports" title="Moderation reports" hidden>⚑</button>
+        <button class="rail-button" id="ownershipNav" type="button" aria-label="Ownership settings" title="Ownership settings" hidden>♙</button>
         <span class="rail-spacer"></span>
         <button class="rail-button invite-rail" id="inviteRail" type="button" aria-label="Invite a member" title="Invite a member">＋</button>
         <span class="rail-foot">V 0.1</span>
@@ -286,7 +287,7 @@
     <dialog class="app-dialog" id="announcementDialog">
       <div class="dialog-shell">
         <button class="dialog-close" data-close type="button" aria-label="Close dialog">×</button>
-        <p class="overline">FACILITY BULLETINS <span class="slash">/</span> OWNER POST</p>
+        <p class="overline">FACILITY BULLETINS <span class="slash">/</span> OWNER TEAM POST</p>
         <h2>Post an announcement.</h2>
         <form class="dialog-form" id="announcementForm">
           <label for="announcementTitleInput">TITLE (UP TO 120 CHARACTERS)</label>
@@ -300,11 +301,52 @@
       </div>
     </dialog>
 
+    <dialog class="app-dialog wide-dialog" id="ownershipDialog">
+      <div class="dialog-shell content-shell ownership-shell">
+        <button class="dialog-close" data-close type="button" aria-label="Close dialog">×</button>
+        <p class="overline">FACILITY CONTROL <span class="slash">/</span> MAIN OWNER ONLY</p>
+        <h2>Ownership settings</h2>
+        <p class="dialog-copy" id="currentSubOwnerStatus">No sub-owner is appointed.</p>
+        <form class="dialog-form ownership-section" id="subOwnerForm">
+          <h3>Appoint a sub-owner</h3>
+          <p class="dialog-copy">The sub-owner can post announcements, review reports, delete reported messages, and temporarily mute members.</p>
+          <label for="subOwnerSelect">SUB-OWNER</label>
+          <select class="dark-input" id="subOwnerSelect"></select>
+          <button class="primary-button" type="submit">SAVE SUB-OWNER →</button>
+          <p class="dialog-error" id="subOwnerError" role="status"></p>
+        </form>
+        <form class="dialog-form ownership-section" id="transferSecretForm">
+          <h3>Ownership transfer secret</h3>
+          <p class="dialog-copy">Use a private, unique secret of at least 16 characters. It is stored as a hash. Enter the current secret to replace it; if lost, it must be reset by a trusted backend administrator.</p>
+          <label for="currentTransferSecret">CURRENT SECRET (ONLY WHEN REPLACING)</label>
+          <input class="dark-input" id="currentTransferSecret" type="password" minlength="16" maxlength="128" autocomplete="off">
+          <label for="newTransferSecret">NEW SECRET</label>
+          <input class="dark-input" id="newTransferSecret" type="password" minlength="16" maxlength="128" autocomplete="new-password" required>
+          <label for="confirmTransferSecret">CONFIRM NEW SECRET</label>
+          <input class="dark-input" id="confirmTransferSecret" type="password" minlength="16" maxlength="128" autocomplete="new-password" required>
+          <button class="primary-button" type="submit">SAVE TRANSFER SECRET →</button>
+          <p class="dialog-error" id="transferSecretError" role="status"></p>
+        </form>
+        <form class="dialog-form ownership-section" id="ownershipTransferForm">
+          <h3>Transfer main ownership</h3>
+          <p class="dialog-copy">The selected member becomes Main Owner, and you become Sub-owner. The previous sub-owner, if different, returns to member status.</p>
+          <label for="transferOwnerSelect">NEW MAIN OWNER</label>
+          <select class="dark-input" id="transferOwnerSelect" required></select>
+          <label for="ownershipTransferSecret">OWNERSHIP TRANSFER SECRET</label>
+          <input class="dark-input" id="ownershipTransferSecret" type="password" minlength="16" maxlength="128" autocomplete="off" required>
+          <label for="confirmTransferText">TYPE TRANSFER TO CONFIRM</label>
+          <input class="dark-input" id="confirmTransferText" autocomplete="off" required>
+          <button class="primary-button" type="submit">TRANSFER MAIN OWNERSHIP →</button>
+          <p class="dialog-error" id="ownershipTransferError" role="status"></p>
+        </form>
+      </div>
+    </dialog>
+
     <dialog class="app-dialog wide-dialog" id="moderationDialog">
       <div class="dialog-shell content-shell">
         <button class="dialog-close" data-close type="button" aria-label="Close dialog">×</button>
         <p class="overline">FACILITY OPERATIONS <span class="slash">/</span> PRIVATE MODERATION</p>
-        <h2>Message reports <span class="channel-live"><i></i> OWNER ONLY</span></h2>
+        <h2>Message reports <span class="channel-live"><i></i> OWNER TEAM</span></h2>
         <div class="moderation-reports" id="moderationReports" aria-live="polite"><p class="feature-empty">Loading reports…</p></div>
       </div>
     </dialog>
@@ -313,7 +355,7 @@
       <div class="dialog-shell">
         <button class="dialog-close" data-close type="button" aria-label="Close dialog">×</button>
         <p class="overline">MEMBER SAFETY <span class="slash">/</span> REPORT MESSAGE</p>
-        <h2>Tell the owner what happened.</h2>
+        <h2>Tell the owner team what happened.</h2>
         <p class="dialog-copy" id="reportMessagePreview"></p>
         <form class="dialog-form" id="reportForm">
           <label for="reportReason">REASON (UP TO 500 CHARACTERS)</label>
