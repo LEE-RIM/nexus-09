@@ -240,7 +240,10 @@ async function initializeMember(user) {
     document.querySelector("#profileButton strong").textContent = profile.display_name.toUpperCase();
     document.querySelector("#profileButton small").textContent =
       `ID ${profile.handle.toUpperCase()} · ${profile.role.replace("_", " ").toUpperCase()}`;
-    document.querySelector("#profileButton .avatar").textContent = profile.display_name.trim().charAt(0).toUpperCase();
+    const profileAvatar = document.querySelector("#profileButton .avatar");
+    profileAvatar.classList.toggle("avatar-main-owner", profile.role === "owner");
+    profileAvatar.classList.toggle("avatar-sub-owner", profile.role === "sub_owner");
+    profileAvatar.textContent = profile.role === "owner" ? "👑" : profile.display_name.trim().charAt(0).toUpperCase();
     document.querySelector("#profileButton").setAttribute("aria-label", "Account options for " + profile.display_name);
     const topbar = document.querySelector(".topbar");
     if (!document.querySelector("#signOutButton")) {
@@ -353,7 +356,7 @@ function renderRoster(profiles) {
     button.setAttribute("aria-label", `View ID card for ${member.name}`);
     const avatar = document.createElement("span");
     avatar.className = `avatar avatar-${member.color}`;
-    avatar.textContent = member.initials;
+    avatar.textContent = member.accountRole === "owner" ? "👑" : member.initials;
     const name = document.createElement("span");
     name.textContent = member.name;
     button.append(avatar, name);
@@ -373,7 +376,7 @@ function renderRoster(profiles) {
     button.type = "button";
     const avatar = document.createElement("span");
     avatar.className = `avatar avatar-${member.color}`;
-    avatar.textContent = member.initials;
+    avatar.textContent = member.accountRole === "owner" ? "👑" : member.initials;
     const details = document.createElement("span");
     const name = document.createElement("strong");
     name.textContent = member.name;
@@ -404,7 +407,7 @@ function showMember(member) {
   document.querySelector("#largeIdCard").replaceChildren();
   const avatar = document.createElement("span");
   avatar.className = `large-id-avatar avatar-${member.color}`;
-  avatar.textContent = member.initials;
+  avatar.textContent = member.accountRole === "owner" ? "👑" : member.initials;
   const copy = document.createElement("span");
   copy.className = "large-id-copy";
   const card = document.querySelector("#largeIdCard");
@@ -575,7 +578,7 @@ function messageElement(message, reactions = []) {
   item.className = `chat-message${own ? " is-you" : ""}${roleClass ? ` ${roleClass}` : ""}`;
   const avatar = document.createElement("span");
   avatar.className = `avatar avatar-${color}`;
-  avatar.textContent = (profile.display_name || "M").trim().charAt(0).toUpperCase();
+  avatar.textContent = role === "owner" ? "👑" : (profile.display_name || "M").trim().charAt(0).toUpperCase();
   const copy = document.createElement("div");
   copy.className = "chat-message-copy";
   const heading = document.createElement("div");
