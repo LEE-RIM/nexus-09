@@ -14,6 +14,7 @@ let currentProfile = null;
 let roomUnlockedUntil = 0;
 let activeRoom = null;
 let pendingRoom = null;
+let pinnedPowerRoomMessageId = null;
 let roomExpiryTimer;
 let presenceChannel;
 let messagesChannel;
@@ -970,7 +971,8 @@ function powerRoomMessageElement(message) {
   const role = profile.role || "member";
   const own = message.sender_id === currentProfile?.id;
   const item = document.createElement("article");
-  item.className = `power-room-message${role === "owner" ? " is-main-owner" : " is-sub-owner"}${own ? " is-you" : ""}`;
+  const pinned = message.id === pinnedPowerRoomMessageId;
+  item.className = `power-room-message${role === "owner" ? " is-main-owner" : " is-sub-owner"}${own ? " is-you" : ""}${pinned ? " is-pinned" : ""}`;
 
   const avatar = document.createElement("span");
   avatar.className = `avatar ${role === "owner" ? "avatar-main-owner" : "avatar-sub-owner"}`;
@@ -996,7 +998,21 @@ function powerRoomMessageElement(message) {
   heading.append(name, badge, time);
   const body = document.createElement("p");
   body.textContent = message.body;
-  copy.append(heading, body);
+  const pinButton = document.createElement("button");
+  pinButton.className = "power-room-pin-action";
+  pinButton.type = "button";
+  pinButton.textContent = pinned ? "◆ UNPIN MESSAGE" : "◇ PIN IMPORTANT MESSAGE";
+  pinButton.setAttribute("aria-label", pinned ? "Unpin this Power Room message" : "Pin this Power Room message");
+  pinButton.addEventListener("click", () => {
+    pinButton.disabled = true;
+    setPowerRoomPinnedMessage(pinned ? null : message.id).catch((error) => {
+      console.error("Could not update the Power Room pinned message.", error);
+      showToast("Power Room message could not be pinned. Try again.");
+    }).finally(() => {
+      pinButton.disabled = false;
+    });
+  });
+  copy.append(heading, body, pinButton);
   item.append(avatar, copy);
   return item;
 }
@@ -1011,7 +1027,26 @@ async function loadPowerRoomMessages() {
     .order("id", { ascending: false })
     .limit(100);
   if (error) throw error;
-  const messages = (data || []).reverse();
+  let messages = (data || []).reverse();
+  const { data: pin, error: pinError } = await supabase
+    .from("power_room_pins")
+    .select("message_id,pinned_by,pinned_at")
+    .eq("singleton", true)
+    .maybeSingle();
+  if (pinError) throw pinError;
+  pinnedPowerRoomMessageId = pin?.message_id ?? null;
+  let pinnedMessage = messages.find((message) => message.id === pinnedPowerRoomMessageId);
+  if (pin && !pinnedMessage) {
+    const result = await supabase
+      .from("power_room_messages")
+      .select("id,body,created_at,sender_id,profiles!power_room_messages_sender_id_fkey(display_name,handle,role)")
+      .eq("id", pin.message_id)
+      .maybeSingle();
+    if (result.error) throw result.error;
+    pinnedMessage = result.data || null;
+    if (pinnedMessage) messages = [...messages, pinnedMessage].sort((a, b) => a.id - b.id);
+  }
+  renderPowerRoomPin(pinnedMessage, pin);
   const thread = document.querySelector("#powerRoomThread");
   if (!messages.length) {
     const empty = document.createElement("p");
@@ -1022,6 +1057,54 @@ async function loadPowerRoomMessages() {
   }
   thread.replaceChildren(...messages.map(powerRoomMessageElement));
   thread.scrollTop = thread.scrollHeight;
+}
+
+function renderPowerRoomPin(message, pin) {
+  const container = document.querySelector("#powerRoomPin");
+  if (!message || !pin) {
+    container.hidden = true;
+    container.replaceChildren();
+    return;
+  }
+  const label = document.createElement("span");
+  label.className = "power-room-pin-label";
+  label.textContent = "◆ PINNED FOR THE OWNER TEAM";
+  const text = document.createElement("p");
+  text.textContent = message.body;
+  const detail = document.createElement("small");
+  const author = message.profiles?.display_name || "Owner team";
+  detail.textContent = `Pinned by ${pin.pinned_by === currentProfile?.id ? "you" : author} · ${new Intl.DateTimeFormat("en", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(new Date(pin.pinned_at))}`;
+  container.replaceChildren(label, text, detail);
+  container.hidden = false;
+}
+
+async function setPowerRoomPinnedMessage(messageId) {
+  if (!["owner", "sub_owner"].includes(currentProfile?.role)) {
+    throw new Error("Only the owner team can pin Power Room messages.");
+  }
+  if (messageId === null) {
+    const { error } = await supabase
+      .from("power_room_pins")
+      .delete()
+      .eq("singleton", true);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase
+      .from("power_room_pins")
+      .upsert({
+        singleton: true,
+        message_id: messageId,
+        pinned_by: currentProfile.id,
+        pinned_at: new Date().toISOString()
+      }, { onConflict: "singleton" });
+    if (error) throw error;
+  }
+  await loadPowerRoomMessages();
 }
 
 async function refreshPowerRoomUnreadCount() {
@@ -1083,6 +1166,17 @@ function subscribeToPowerRoom() {
       update.catch((error) => {
         console.error("Could not refresh Power Room activity.", error);
         showToast("Power Room activity could not be refreshed.");
+      });
+    })
+    .on("postgres_changes", {
+      event: "*",
+      schema: "public",
+      table: "power_room_pins"
+    }, () => {
+      if (!document.querySelector("#powerRoomDialog").open) return;
+      loadPowerRoomMessages().catch((error) => {
+        console.error("Could not refresh the Power Room pinned message.", error);
+        showToast("Power Room pinned message could not be refreshed.");
       });
     })
     .subscribe((status) => {

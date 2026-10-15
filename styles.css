@@ -291,8 +291,13 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .chat-compose button { width: 39px; border: 1px solid rgb(123 228 227 / 36%); border-radius: 4px; background: rgb(123 228 227 / 9%); color: var(--cyan); font-size: 17px; cursor: pointer; }
 .power-room-dot { display: inline-block; width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; background: #c6b9ff; box-shadow: 0 0 9px rgb(174 161 255 / 70%); }
 .power-room-copy { margin: 10px 0 0; }
+.power-room-pin { display: grid; gap: 5px; margin-top: 13px; padding: 11px 13px; border: 1px solid rgb(255 210 105 / 28%); border-radius: 4px; background: linear-gradient(100deg, rgb(255 210 105 / 7%), rgb(174 161 255 / 3%)); }
+.power-room-pin-label { color: #e8cc85; font: 7px var(--mono); letter-spacing: .65px; }
+.power-room-pin p { margin: 0; color: #e2e2de; font-size: 10px; line-height: 1.5; overflow-wrap: anywhere; white-space: pre-wrap; }
+.power-room-pin small { color: #87939a; font: 6px var(--mono); }
 .power-room-thread { display: flex; min-height: 280px; max-height: min(48vh, 560px); flex-direction: column; gap: 12px; margin-top: 16px; padding: 14px; overflow-y: auto; border: 1px solid rgb(174 161 255 / 20%); border-radius: 5px; background: radial-gradient(ellipse at top right, rgb(174 161 255 / 5%), transparent 55%), rgb(7 11 15 / 72%); }
 .power-room-message { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 9px; padding: 9px; border: 1px solid rgb(174 161 255 / 12%); border-radius: 5px; background: rgb(174 161 255 / 3%); }
+.power-room-message.is-pinned { border-color: rgb(255 210 105 / 35%); }
 .power-room-message .avatar { width: 29px; height: 29px; font-size: 10px; }
 .power-room-message.is-main-owner { border-color: rgb(255 210 105 / 22%); background: linear-gradient(100deg, rgb(255 210 105 / 5%), transparent 75%); }
 .power-room-message.is-sub-owner { border-color: rgb(174 161 255 / 22%); background: linear-gradient(100deg, rgb(174 161 255 / 6%), transparent 75%); }
@@ -304,6 +309,9 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .power-room-message-heading small { color: #a69ce0; font: 6px var(--mono); }
 .power-room-message-heading time { margin-left: auto; color: #71808a; font: 6px var(--mono); }
 .power-room-message-copy p { margin: 5px 0 0; color: #c0c6ca; font-size: 10px; line-height: 1.55; overflow-wrap: anywhere; white-space: pre-wrap; }
+.power-room-pin-action { min-height: 25px; margin-top: 7px; padding: 0 8px; border: 1px solid rgb(174 161 255 / 24%); border-radius: 3px; background: rgb(174 161 255 / 5%); color: #bfb7f5; font: 6px var(--mono); cursor: pointer; }
+.power-room-pin-action:hover { border-color: rgb(255 210 105 / 45%); color: #ffe29a; }
+.power-room-pin-action:disabled { opacity: .55; cursor: wait; }
 .power-room-compose { margin-top: 10px; }
 .power-room-compose input { min-height: 42px; }
 .power-room-compose button { border-color: rgb(174 161 255 / 40%); background: rgb(174 161 255 / 10%); color: #c9c0ff; }
@@ -479,6 +487,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
   .vip-open-button { font-size: 7px; }
   .power-room-dialog { width: calc(100% - 16px); max-height: 92dvh; }
   .power-room-thread { min-height: 34dvh; max-height: 48dvh; padding: 10px; }
+  .power-room-pin { padding: 9px 10px; }
   .power-room-message { grid-template-columns: 27px minmax(0, 1fr); gap: 7px; padding: 8px; }
   .power-room-message .avatar { width: 26px; height: 26px; }
   .power-room-message-copy p { font-size: 11px; }
