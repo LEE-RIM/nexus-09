@@ -322,7 +322,24 @@
         <h2 id="memberName">Member name</h2>
         <p class="member-bio" id="memberBio"></p>
         <div class="member-meta"><span>ACCESS TIER <strong id="memberTier"></strong></span><span>STATUS <strong class="member-active"><i></i> ACTIVE</strong></span></div>
+        <button class="secondary-button member-pass-button" id="memberPassButton" type="button" hidden>SHOW FULL MEMBER PASS ▦</button>
         <button class="primary-button member-message-button" id="memberDmButton" type="button">SEND PRIVATE MESSAGE →</button>
+      </div>
+    </dialog>
+
+    <dialog class="app-dialog" id="memberPassDialog">
+      <div class="dialog-shell member-pass-shell">
+        <button class="dialog-close" data-close type="button" aria-label="Close dialog">×</button>
+        <p class="overline">NEXUS-09 <span class="slash">/</span> MEMBER PASS</p>
+        <h2>Show your pass.</h2>
+        <p class="dialog-copy">Let another NEXUS-09 member scan this code to open your profile. Sign-in is required.</p>
+        <div class="member-pass-frame" id="memberPassFrame">
+          <canvas id="memberPassQr" width="240" height="240" aria-label="QR code for your NEXUS-09 member profile"></canvas>
+        </div>
+        <p class="member-pass-id" id="memberPassId"></p>
+        <button class="secondary-button member-pass-copy" id="memberPassCopyButton" type="button">COPY PROFILE LINK</button>
+        <p class="dialog-error" id="memberPassError" role="status" aria-live="polite"></p>
+        <p class="member-pass-note">The QR contains only your public member ID and this website link—never your secret code.</p>
       </div>
     </dialog>
 

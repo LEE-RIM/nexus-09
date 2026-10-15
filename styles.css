@@ -409,6 +409,8 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .id-card-large.is-member-card .large-id-avatar { position: relative; z-index: 1; border-radius: 7px; background: linear-gradient(145deg, #245058, #15242d); box-shadow: inset 0 0 18px rgb(123 228 227 / 10%); }
 .large-id-copy { display: grid; gap: 6px; }
 .id-card-large.is-member-card .large-id-copy { position: relative; z-index: 1; min-width: 0; }
+.member-card-qr-button { position: relative; z-index: 3; display: grid; width: 84px; height: 84px; flex: 0 0 auto; place-items: center; padding: 3px; border: 1px solid rgb(123 228 227 / 40%); border-radius: 4px; background: #f2fbf8; cursor: pointer; }
+.member-card-qr { display: block; width: 76px; height: 76px; image-rendering: pixelated; }
 .large-id-copy strong { color: #ebf0f0; font: 500 13px var(--display); }
 .large-id-copy span { color: #88aaa9; font: 7px var(--mono); letter-spacing: .6px; }
 .large-id-copy small { color: #71828b; font: 6px var(--mono); }
@@ -423,6 +425,19 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .member-meta > span { display: grid; gap: 5px; color: #73828a; font: 6px var(--mono); letter-spacing: .5px; }
 .member-meta strong { color: #b6c4c7; font: 8px var(--mono); }
 .member-active { display: flex; align-items: center; gap: 5px; color: #92d5a5 !important; }
+.member-pass-button { width: 100%; margin-top: 15px; }
+.member-pass-shell { text-align: center; }
+.member-pass-shell .overline { text-align: left; }
+.member-pass-shell h2 { margin-bottom: 8px; }
+.member-pass-shell .dialog-copy { max-width: 330px; margin: 0 auto 16px; }
+.member-pass-frame { position: relative; display: grid; width: min(270px, 100%); aspect-ratio: 1; place-items: center; margin: 0 auto; overflow: hidden; border: 1px solid rgb(123 228 227 / 43%); border-radius: 8px; background: #f2fbf8; box-shadow: 0 0 30px rgb(123 228 227 / 12%); }
+.member-pass-frame canvas { position: relative; z-index: 1; display: block; width: 240px; max-width: calc(100% - 24px); height: auto; image-rendering: pixelated; }
+.member-pass-frame::after { position: absolute; z-index: 2; top: -30%; right: 0; left: 0; height: 14%; background: linear-gradient(180deg, transparent, rgb(61 208 203 / 22%), transparent); animation: member-pass-scan 3.2s ease-in-out infinite; content: ""; pointer-events: none; }
+.member-pass-id { margin: 13px 0 10px; color: #9ce8dc; font: 8px var(--mono); letter-spacing: .8px; }
+.member-pass-copy { width: min(270px, 100%); }
+.member-pass-shell .dialog-error { min-height: 0; margin: 8px 0 0; }
+.member-pass-note { max-width: 300px; margin: 13px auto 0; color: #74858b; font-size: 8px; line-height: 1.6; }
+@keyframes member-pass-scan { 0%, 8% { transform: translateY(0); } 92%, 100% { transform: translateY(950%); } }
 .invite-capacity { display: flex; justify-content: space-between; margin: 20px 0 11px; padding: 11px; border: 1px solid var(--line); border-radius: 4px; color: #71818a; font: 7px var(--mono); }
 .invite-capacity strong { color: #c5d5d6; font-weight: 400; }
 .invite-capacity b { color: var(--cyan); font-weight: 500; }
@@ -508,6 +523,11 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
   .announcement-card-heading { align-items: flex-start; }
   .content-shell { padding: 27px 19px; }
   .roster-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .id-card-large.is-member-card { gap: 9px; padding: 13px; }
+  .id-card-large.is-member-card .large-id-avatar { width: 48px; height: 58px; }
+  .member-card-qr-button { width: 68px; height: 68px; }
+  .member-card-qr { width: 60px; height: 60px; }
+  .id-card-large.is-member-card .large-id-copy strong { max-width: 100px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
 @media (max-width: 390px) {
   .topbar-status { font-size: 6px; }
@@ -519,5 +539,6 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
   .enter-room-button { padding: 0 5px; font-size: 5px; }
 }
 @media (prefers-reduced-motion: reduce) {
+  .member-pass-frame::after { animation: none; }
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }

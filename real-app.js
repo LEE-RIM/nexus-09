@@ -25,6 +25,7 @@ let toastTimer;
 let memberInitializing = false;
 let profilesCache = [];
 let communityFeatures;
+let qrCodeModulePromise;
 
 document.body.classList.add("real-mode");
 const demoBanner = document.querySelector(".demo-banner");
@@ -274,6 +275,7 @@ async function initializeMember(user) {
     document.querySelector("#onlineCount").textContent = "01";
     document.querySelector("#labAccessCode").value = "";
     await loadRoster();
+    openScannedMemberProfile();
     if (!communityFeatures) {
       communityFeatures = initCommunityFeatures({
         supabase,
@@ -534,13 +536,119 @@ function showMember(member) {
     copy.append(joined);
   }
   document.querySelector("#largeIdCard").append(avatar, copy);
+  if (member.accountRole === "member") {
+    const qrButton = document.createElement("button");
+    qrButton.className = "member-card-qr-button";
+    qrButton.type = "button";
+    qrButton.setAttribute("aria-label", `Enlarge QR code for ${member.name}'s member profile`);
+    const qr = document.createElement("canvas");
+    qr.className = "member-card-qr";
+    qr.width = 96;
+    qr.height = 96;
+    qrButton.append(qr);
+    document.querySelector("#largeIdCard").append(qrButton);
+    renderMemberQr(qr, member.id, 96).catch((error) => {
+      console.error("Could not create the member ID card QR code.", error);
+      showToast("This member ID card's QR code could not be loaded.");
+    });
+    qrButton.addEventListener("click", () => openMemberPass(member.id));
+  }
   document.querySelector("#memberName").textContent = member.name;
   document.querySelector("#memberBio").textContent = member.bio;
   document.querySelector("#memberTier").textContent = member.tier;
   const messageButton = document.querySelector("#memberDmButton");
   messageButton.dataset.memberId = member.userId || "";
   messageButton.hidden = !member.userId || member.userId === currentProfile?.id;
+  document.querySelector("#memberPassButton").hidden =
+    member.accountRole !== "member" || member.userId !== currentProfile?.id;
   openDialog(document.querySelector("#memberDialog"));
+}
+
+async function getQrCodeModule() {
+  if (!qrCodeModulePromise) {
+    qrCodeModulePromise = import("https://esm.sh/qrcode@1.5.4")
+      .then((module) => module.default)
+      .catch((error) => {
+        qrCodeModulePromise = null;
+        throw error;
+      });
+  }
+  return qrCodeModulePromise;
+}
+
+async function renderMemberQr(canvas, handle, width) {
+  const qrCode = await getQrCodeModule();
+  await qrCode.toCanvas(canvas, memberProfileUrl(handle), {
+    width,
+    margin: 2,
+    color: { dark: "#10232a", light: "#f2fbf8" },
+    errorCorrectionLevel: "M"
+  });
+}
+
+async function openMemberPass(handle) {
+  const errorBox = document.querySelector("#memberPassError");
+  errorBox.textContent = "";
+  try {
+    await renderMemberQr(document.querySelector("#memberPassQr"), handle, 240);
+    const passUrl = memberProfileUrl(handle);
+    document.querySelector("#memberPassId").textContent = `NEXUS-09 · ID ${handle.toUpperCase()}`;
+    document.querySelector("#memberPassCopyButton").dataset.profileUrl = passUrl;
+    document.querySelector("#memberDialog").close();
+    openDialog(document.querySelector("#memberPassDialog"));
+  } catch (error) {
+    console.error("Could not create the NEXUS-09 member pass QR code.", error);
+    errorBox.textContent = "The pass could not be created. Check your connection and try again.";
+    showToast("The member QR pass could not be generated. Check your connection and try again.");
+  }
+}
+
+function memberProfileUrl(handle) {
+  const url = new URL(location.href);
+  url.search = "";
+  url.hash = "";
+  url.searchParams.set("member", handle);
+  return url.href;
+}
+
+document.querySelector("#memberPassButton").addEventListener("click", async () => {
+  const button = document.querySelector("#memberPassButton");
+  button.disabled = true;
+  try {
+    await openMemberPass(currentProfile.handle);
+  } catch (error) {
+    console.error("Could not open the NEXUS-09 member pass.", error);
+    showToast("The member pass could not be opened. Please try again.");
+  } finally {
+    button.disabled = false;
+  }
+});
+
+document.querySelector("#memberPassCopyButton").addEventListener("click", async (event) => {
+  const button = event.currentTarget;
+  const errorBox = document.querySelector("#memberPassError");
+  errorBox.textContent = "";
+  try {
+    await navigator.clipboard.writeText(button.dataset.profileUrl);
+    showToast("Member profile link copied.");
+  } catch (error) {
+    console.error("Could not copy the NEXUS-09 member profile link.", error);
+    errorBox.textContent = "The link could not be copied. You can scan the QR code instead.";
+  }
+});
+
+function openScannedMemberProfile() {
+  const url = new URL(location.href);
+  const handle = url.searchParams.get("member");
+  if (!handle) return;
+  url.searchParams.delete("member");
+  history.replaceState(null, "", url);
+  const profile = profilesCache.find((member) => member.handle.toLowerCase() === handle.toLowerCase());
+  if (!profile) {
+    showToast("That member profile could not be found in the NEXUS-09 roster.");
+    return;
+  }
+  showMember(toMember(profile));
 }
 
 function subscribePresence() {
