@@ -275,7 +275,7 @@ async function initializeMember(user) {
       signOut.addEventListener("click", signOutMember);
       topbar.append(signOut);
     }
-    document.querySelector("#onlineCount").textContent = "01";
+    document.querySelector("#onlineCount").textContent = "—";
     document.querySelector("#labAccessCode").value = "";
     await loadRoster();
     openScannedMemberProfile();
@@ -448,6 +448,18 @@ function renderRoster(profiles) {
   renderVipSpotlight();
 }
 
+function setPowerRoomUnreadCount(count) {
+  const badge = document.querySelector("#powerRoomUnreadBadge");
+  if (!badge) return;
+  badge.hidden = count < 1;
+  badge.textContent = count > 99 ? "99+" : String(count);
+  badge.setAttribute("aria-label", `${count} unread Power Room message${count === 1 ? "" : "s"}`);
+  document.querySelector("#vipOpenPowerRoom").setAttribute(
+    "aria-label",
+    count ? `Open Power Room, ${count} unread message${count === 1 ? "" : "s"}` : "Open Power Room"
+  );
+}
+
 function renderVipSpotlight() {
   const vipPanel = document.querySelector("#vipPanel");
   const isOwnerTeam = ["owner", "sub_owner"].includes(currentProfile?.role);
@@ -470,18 +482,6 @@ function renderVipSpotlight() {
     ownerName.textContent = "Main owner";
     ownerMeta.textContent = "No owner assigned yet";
     ownerQuote.textContent = "Leadership access secured for the inner facility.";
-  }
-
-  function setPowerRoomUnreadCount(count) {
-    const badge = document.querySelector("#powerRoomUnreadBadge");
-    if (!badge) return;
-    badge.hidden = count < 1;
-    badge.textContent = count > 99 ? "99+" : String(count);
-    badge.setAttribute("aria-label", `${count} unread Power Room message${count === 1 ? "" : "s"}`);
-    document.querySelector("#vipOpenPowerRoom").setAttribute(
-      "aria-label",
-      count ? `Open Power Room, ${count} unread message${count === 1 ? "" : "s"}` : "Open Power Room"
-    );
   }
 
   if (subOwner) {
@@ -659,11 +659,15 @@ function subscribePresence() {
   presenceChannel = supabase.channel("nexus09-presence", {
     config: { private: true, presence: { key: currentProfile.id } }
   });
+  function updateOnlineCount() {
+    if (!presenceChannel) return;
+    const online = Object.keys(presenceChannel.presenceState()).length;
+    document.querySelector("#onlineCount").textContent = String(online).padStart(2, "0");
+  }
   presenceChannel
-    .on("presence", { event: "sync" }, () => {
-      const online = Object.keys(presenceChannel.presenceState()).length;
-      document.querySelector("#onlineCount").textContent = String(online).padStart(2, "0");
-    })
+    .on("presence", { event: "sync" }, updateOnlineCount)
+    .on("presence", { event: "join" }, updateOnlineCount)
+    .on("presence", { event: "leave" }, updateOnlineCount)
     .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => {
       loadRoster().catch((error) => {
         console.error("Could not refresh the NEXUS-09 member roster.", error);
@@ -672,10 +676,13 @@ function subscribePresence() {
     })
     .subscribe(async (status) => {
       if (status === "SUBSCRIBED") {
-        const { error } = await presenceChannel.track({ handle: currentProfile.handle });
-        if (error) {
-          console.error("Could not publish online presence.", error);
+        const trackStatus = await presenceChannel.track({ handle: currentProfile.handle });
+        if (trackStatus !== "ok") {
+          console.error("Could not publish online presence.", trackStatus);
           showToast("Live online status is unavailable right now.");
+          document.querySelector("#onlineCount").textContent = "—";
+        } else {
+          updateOnlineCount();
         }
       } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
         console.error("NEXUS-09 presence channel failed.", status);
