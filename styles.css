@@ -399,14 +399,21 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .id-card-large { position: relative; display: flex; min-height: 131px; align-items: center; gap: 17px; margin-bottom: 23px; padding: 17px; overflow: hidden; border: 1px solid rgb(123 228 227 / 26%); border-radius: 5px; background: linear-gradient(115deg, #192a31, #111b22 65%, #18292a); }
 .id-card-large.is-main-owner { border-color: rgb(255 210 105 / 62%); background: linear-gradient(115deg, #443719, #211b12 65%, #362b16); box-shadow: inset 0 0 32px rgb(255 210 105 / 7%), 0 0 22px rgb(255 210 105 / 8%); }
 .id-card-large.is-sub-owner { border-color: rgb(157 148 255 / 58%); background: linear-gradient(115deg, #302e50, #171725 65%, #27233f); box-shadow: inset 0 0 32px rgb(157 148 255 / 6%), 0 0 22px rgb(157 148 255 / 7%); }
+.id-card-large.is-member-card { min-height: 151px; border-color: rgb(123 228 227 / 34%); background: linear-gradient(115deg, #163037, #101b23 62%, #142a2b); box-shadow: inset 0 0 32px rgb(123 228 227 / 5%), 0 0 22px rgb(123 228 227 / 5%); }
+.id-card-large.is-member-card::before { position: absolute; z-index: 1; inset: 0 auto 0 0; width: 3px; background: linear-gradient(180deg, transparent, var(--cyan), transparent); content: ""; }
 .id-card-large.is-main-owner::after { border-color: rgb(255 210 105 / 27%); }
 .id-card-large.is-sub-owner::after { border-color: rgb(157 148 255 / 25%); }
+.id-card-large.is-member-card::after { border-color: rgb(123 228 227 / 23%); }
 .id-card-large::after { position: absolute; top: -60px; right: -31px; width: 145px; height: 220px; border: 1px solid rgb(123 228 227 / 13%); transform: rotate(39deg); content: ""; }
 .large-id-avatar { display: grid; width: 61px; height: 71px; flex: 0 0 auto; place-items: center; border: 1px solid rgb(123 228 227 / 40%); border-radius: 4px; background: linear-gradient(145deg, #294047, #152129); color: var(--cyan); font: 500 24px var(--display); }
+.id-card-large.is-member-card .large-id-avatar { position: relative; z-index: 1; border-radius: 7px; background: linear-gradient(145deg, #245058, #15242d); box-shadow: inset 0 0 18px rgb(123 228 227 / 10%); }
 .large-id-copy { display: grid; gap: 6px; }
+.id-card-large.is-member-card .large-id-copy { position: relative; z-index: 1; min-width: 0; }
 .large-id-copy strong { color: #ebf0f0; font: 500 13px var(--display); }
 .large-id-copy span { color: #88aaa9; font: 7px var(--mono); letter-spacing: .6px; }
 .large-id-copy small { color: #71828b; font: 6px var(--mono); }
+.member-id-stamp { width: fit-content; padding: 4px 6px; border: 1px solid rgb(123 228 227 / 26%); border-radius: 3px; background: rgb(123 228 227 / 7%); color: #9ce8dc !important; font: 6px var(--mono) !important; letter-spacing: .7px; }
+.large-id-copy .member-since { color: #8eaaa9; }
 .id-card-large.is-main-owner .large-id-copy strong { color: #ffe29a; }
 .id-card-large.is-main-owner .large-id-copy > span:not(.member-role-badge) { color: #d5b767; }
 .id-card-large.is-sub-owner .large-id-copy strong { color: #d4cfff; }

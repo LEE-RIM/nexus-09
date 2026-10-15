@@ -346,6 +346,8 @@ async function loadRoster() {
 
 function toMember(profile) {
   const colors = ["cyan", "violet", "amber", "rose", "blue", "green"];
+  const joinedAt = new Intl.DateTimeFormat("en", { month: "short", year: "numeric" })
+    .format(new Date(profile.created_at));
   return {
     id: profile.handle,
     userId: profile.id,
@@ -361,7 +363,8 @@ function toMember(profile) {
       : profile.role === "sub_owner"
         ? "SUB-OWNER"
         : "MEMBER",
-    bio: `NEXUS-09 member since ${new Intl.DateTimeFormat("en", { month: "short", year: "numeric" }).format(new Date(profile.created_at))}.`,
+    joinedAt,
+    bio: `NEXUS-09 member since ${joinedAt}.`,
     initials: profile.display_name.trim().charAt(0).toUpperCase(),
     color: profile.role === "owner"
       ? "main-owner"
@@ -502,6 +505,13 @@ function showMember(member) {
   const card = document.querySelector("#largeIdCard");
   card.classList.toggle("is-main-owner", member.accountRole === "owner");
   card.classList.toggle("is-sub-owner", member.accountRole === "sub_owner");
+  card.classList.toggle("is-member-card", member.accountRole === "member");
+  if (member.accountRole === "member") {
+    const stamp = document.createElement("span");
+    stamp.className = "member-id-stamp";
+    stamp.textContent = "✓ LEE GON · NEXUS-09";
+    copy.append(stamp);
+  }
   const name = document.createElement("strong");
   name.textContent = member.name.toUpperCase();
   const role = document.createElement("span");
@@ -517,6 +527,12 @@ function showMember(member) {
   const id = document.createElement("small");
   id.textContent = `NEXUS-09 · ID ${member.id.toUpperCase()}`;
   copy.append(id);
+  if (member.accountRole === "member") {
+    const joined = document.createElement("small");
+    joined.className = "member-since";
+    joined.textContent = `MEMBER SINCE · ${member.joinedAt.toUpperCase()}`;
+    copy.append(joined);
+  }
   document.querySelector("#largeIdCard").append(avatar, copy);
   document.querySelector("#memberName").textContent = member.name;
   document.querySelector("#memberBio").textContent = member.bio;
