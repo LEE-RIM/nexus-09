@@ -254,7 +254,11 @@ async function initializeMember(user) {
     const profileAvatar = document.querySelector("#profileButton .avatar");
     profileAvatar.classList.toggle("avatar-main-owner", profile.role === "owner");
     profileAvatar.classList.toggle("avatar-sub-owner", profile.role === "sub_owner");
-    profileAvatar.textContent = profile.role === "owner" ? "👑" : profile.display_name.trim().charAt(0).toUpperCase();
+    profileAvatar.textContent = profile.role === "owner"
+      ? "👑"
+      : profile.role === "sub_owner"
+        ? "♛"
+        : profile.display_name.trim().charAt(0).toUpperCase();
     document.querySelector("#profileButton").setAttribute("aria-label", "Account options for " + profile.display_name);
     const topbar = document.querySelector(".topbar");
     if (!document.querySelector("#signOutButton")) {
@@ -371,7 +375,11 @@ function renderRoster(profiles) {
     button.setAttribute("aria-label", `View ID card for ${member.name}`);
     const avatar = document.createElement("span");
     avatar.className = `avatar avatar-${member.color}`;
-    avatar.textContent = member.accountRole === "owner" ? "👑" : member.initials;
+    avatar.textContent = member.accountRole === "owner"
+      ? "👑"
+      : member.accountRole === "sub_owner"
+        ? "♛"
+        : member.initials;
     const name = document.createElement("span");
     name.textContent = member.name;
     button.append(avatar, name);
@@ -391,7 +399,11 @@ function renderRoster(profiles) {
     button.type = "button";
     const avatar = document.createElement("span");
     avatar.className = `avatar avatar-${member.color}`;
-    avatar.textContent = member.accountRole === "owner" ? "👑" : member.initials;
+    avatar.textContent = member.accountRole === "owner"
+      ? "👑"
+      : member.accountRole === "sub_owner"
+        ? "♛"
+        : member.initials;
     const details = document.createElement("span");
     const name = document.createElement("strong");
     name.textContent = member.name;
@@ -459,7 +471,11 @@ function showMember(member) {
   document.querySelector("#largeIdCard").replaceChildren();
   const avatar = document.createElement("span");
   avatar.className = `large-id-avatar avatar-${member.color}`;
-  avatar.textContent = member.accountRole === "owner" ? "👑" : member.initials;
+  avatar.textContent = member.accountRole === "owner"
+    ? "👑"
+    : member.accountRole === "sub_owner"
+      ? "♛"
+      : member.initials;
   const copy = document.createElement("span");
   copy.className = "large-id-copy";
   const card = document.querySelector("#largeIdCard");
@@ -802,7 +818,11 @@ function messageElement(message, reactions = []) {
   item.className = `chat-message${own ? " is-you" : ""}${roleClass ? ` ${roleClass}` : ""}`;
   const avatar = document.createElement("span");
   avatar.className = `avatar avatar-${color}`;
-  avatar.textContent = role === "owner" ? "👑" : (profile.display_name || "M").trim().charAt(0).toUpperCase();
+  avatar.textContent = role === "owner"
+    ? "👑"
+    : role === "sub_owner"
+      ? "♛"
+      : (profile.display_name || "M").trim().charAt(0).toUpperCase();
   const copy = document.createElement("div");
   copy.className = "chat-message-copy";
   const heading = document.createElement("div");
@@ -934,7 +954,7 @@ function powerRoomMessageElement(message) {
 
   const avatar = document.createElement("span");
   avatar.className = `avatar ${role === "owner" ? "avatar-main-owner" : "avatar-sub-owner"}`;
-  avatar.textContent = role === "owner" ? "👑" : "💸";
+  avatar.textContent = role === "owner" ? "👑" : "♛";
 
   const copy = document.createElement("div");
   copy.className = "power-room-message-copy";
@@ -943,7 +963,7 @@ function powerRoomMessageElement(message) {
   const name = document.createElement("strong");
   name.textContent = profile.display_name || "Owner team";
   const badge = document.createElement("small");
-  badge.textContent = role === "owner" ? "✦ MAIN OWNER" : "💸 SUB-OWNER";
+  badge.textContent = role === "owner" ? "✦ MAIN OWNER" : "◆ SUB-OWNER";
   const time = document.createElement("time");
   const date = new Date(message.created_at);
   time.dateTime = date.toISOString();

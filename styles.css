@@ -51,7 +51,8 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .avatar { display: grid; width: 30px; height: 30px; flex: 0 0 auto; place-items: center; border: 1px solid rgb(123 228 227 / 35%); border-radius: 4px; background: linear-gradient(145deg, #263b41, #141f28); color: var(--cyan); font: 600 11px var(--display); }
 .avatar-main-owner { border-color: rgb(255 210 105 / 85%); background: linear-gradient(145deg, #6c5423, #292012); color: #ffe29a; box-shadow: 0 0 13px rgb(255 205 95 / 20%); }
 .profile-chip .avatar-main-owner { font-size: 15px; }
-.avatar-sub-owner { border-color: rgb(157 148 255 / 75%); background: linear-gradient(145deg, #39365f, #1b1a32); color: #c1baff; box-shadow: 0 0 11px rgb(142 129 255 / 15%); }
+.avatar-sub-owner { position: relative; border-color: rgb(157 148 255 / 75%); background: linear-gradient(145deg, #39365f, #1b1a32); color: #d5d0ff; box-shadow: 0 0 11px rgb(142 129 255 / 15%); }
+.avatar-sub-owner::after { position: absolute; top: -4px; right: -4px; color: #e6dcff; content: "◆"; font: 7px var(--mono); text-shadow: 0 0 7px rgb(198 185 255 / 85%); }
 .demo-banner { padding: 8px 20px; border-bottom: 1px solid rgb(255 189 118 / 13%); background: rgb(255 189 118 / 4%); color: #988b7e; font: 8px var(--mono); letter-spacing: .35px; text-align: center; }
 .demo-banner span { margin-right: 8px; color: var(--amber); font-weight: 500; letter-spacing: 1px; }
 

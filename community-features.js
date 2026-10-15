@@ -825,7 +825,11 @@ function createMessageElement(message, currentProfile) {
   item.className = `chat-message${own ? " is-you" : ""}${roleClass ? ` ${roleClass}` : ""}`;
   const avatar = document.createElement("span");
   avatar.className = `avatar avatar-${color}`;
-  avatar.textContent = role === "owner" ? "👑" : (profile.display_name || "M").trim().charAt(0).toUpperCase();
+  avatar.textContent = role === "owner"
+    ? "👑"
+    : role === "sub_owner"
+      ? "♛"
+      : (profile.display_name || "M").trim().charAt(0).toUpperCase();
   const copy = document.createElement("div");
   copy.className = "chat-message-copy";
   const heading = document.createElement("div");
