@@ -329,6 +329,14 @@ async function loadRoster() {
   document.querySelector("#chatDialog .chat-aside > span:nth-child(3)").textContent =
     "Messages are shared live with authenticated NEXUS-09 members who have unlocked the room.";
   renderRoster(roster);
+  if (["owner", "sub_owner"].includes(currentProfile?.role)) {
+    refreshPowerRoomUnreadCount().catch((error) => {
+      console.error("Could not load Power Room unread count.", error);
+      showToast("Power Room unread messages could not be checked.");
+    });
+  } else {
+    setPowerRoomUnreadCount(0);
+  }
   if (communityFeatures) {
     await communityFeatures.loadConversations();
     if (["owner", "sub_owner"].includes(currentProfile?.role)) await communityFeatures.loadReports();
@@ -453,6 +461,18 @@ function renderVipSpotlight() {
     ownerName.textContent = "Main owner";
     ownerMeta.textContent = "No owner assigned yet";
     ownerQuote.textContent = "Leadership access secured for the inner facility.";
+  }
+
+  function setPowerRoomUnreadCount(count) {
+    const badge = document.querySelector("#powerRoomUnreadBadge");
+    if (!badge) return;
+    badge.hidden = count < 1;
+    badge.textContent = count > 99 ? "99+" : String(count);
+    badge.setAttribute("aria-label", `${count} unread Power Room message${count === 1 ? "" : "s"}`);
+    document.querySelector("#vipOpenPowerRoom").setAttribute(
+      "aria-label",
+      count ? `Open Power Room, ${count} unread message${count === 1 ? "" : "s"}` : "Open Power Room"
+    );
   }
 
   if (subOwner) {
@@ -1004,6 +1024,50 @@ async function loadPowerRoomMessages() {
   thread.scrollTop = thread.scrollHeight;
 }
 
+async function refreshPowerRoomUnreadCount() {
+  if (!["owner", "sub_owner"].includes(currentProfile?.role)) {
+    setPowerRoomUnreadCount(0);
+    return;
+  }
+  const { data: cursor, error: cursorError } = await supabase
+    .from("power_room_reads")
+    .select("last_read_message_id")
+    .eq("user_id", currentProfile.id)
+    .maybeSingle();
+  if (cursorError) throw cursorError;
+  const { count, error } = await supabase
+    .from("power_room_messages")
+    .select("id", { count: "exact", head: true })
+    .gt("id", cursor?.last_read_message_id ?? 0)
+    .neq("sender_id", currentProfile.id);
+  if (error) throw error;
+  setPowerRoomUnreadCount(count ?? 0);
+}
+
+async function markPowerRoomRead() {
+  if (!["owner", "sub_owner"].includes(currentProfile?.role)) return;
+  const { data: latest, error: latestError } = await supabase
+    .from("power_room_messages")
+    .select("id")
+    .order("id", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (latestError) throw latestError;
+  if (!latest) {
+    setPowerRoomUnreadCount(0);
+    return;
+  }
+  const { error } = await supabase
+    .from("power_room_reads")
+    .upsert({
+      user_id: currentProfile.id,
+      last_read_message_id: latest.id,
+      updated_at: new Date().toISOString()
+    }, { onConflict: "user_id" });
+  if (error) throw error;
+  setPowerRoomUnreadCount(0);
+}
+
 function subscribeToPowerRoom() {
   if (powerRoomChannel || !["owner", "sub_owner"].includes(currentProfile?.role)) return;
   powerRoomChannel = supabase
@@ -1013,9 +1077,12 @@ function subscribeToPowerRoom() {
       schema: "public",
       table: "power_room_messages"
     }, () => {
-      loadPowerRoomMessages().catch((error) => {
-        console.error("Could not refresh Power Room messages.", error);
-        showToast("A Power Room message arrived but the chat could not refresh.");
+      const update = document.querySelector("#powerRoomDialog").open
+        ? loadPowerRoomMessages().then(markPowerRoomRead)
+        : refreshPowerRoomUnreadCount();
+      update.catch((error) => {
+        console.error("Could not refresh Power Room activity.", error);
+        showToast("Power Room activity could not be refreshed.");
       });
     })
     .subscribe((status) => {
@@ -1042,7 +1109,9 @@ async function openPowerRoom() {
   try {
     await loadPowerRoomMessages();
     openDialog(document.querySelector("#powerRoomDialog"));
+    await markPowerRoomRead();
     subscribeToPowerRoom();
+    await refreshPowerRoomUnreadCount();
     window.setTimeout(() => document.querySelector("#powerRoomInput").focus(), 30);
   } catch (error) {
     console.error("Could not load Power Room messages.", error);
@@ -1069,6 +1138,7 @@ document.querySelector("#powerRoomForm").addEventListener("submit", async (event
     if (error) throw error;
     input.value = "";
     await loadPowerRoomMessages();
+    await markPowerRoomRead();
   } catch (error) {
     console.error("Could not send a Power Room message.", error);
     showToast(friendlyError(error, "Power Room message could not be sent."));
@@ -1169,6 +1239,7 @@ for (const dialog of document.querySelectorAll(".app-dialog")) {
 }
 
 async function signOutMember() {
+  setPowerRoomUnreadCount(0);
   roomUnlockedUntil = 0;
   activeRoom = null;
   pendingRoom = null;

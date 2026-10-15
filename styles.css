@@ -178,6 +178,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .vip-card p { margin: 12px 0 0; color: #b8c5cc; font-size: 10px; line-height: 1.6; }
 .vip-open-button { border-color: rgba(255, 210, 105, 0.25); color: #ffe29a; }
 .vip-open-button { min-height: 38px; }
+.power-room-unread { display: inline-grid; min-width: 17px; height: 17px; margin: 0 4px 0 7px; padding: 0 4px; place-items: center; border-radius: 9px; background: #d77a75; color: #fff7f4; font: 7px var(--mono); box-shadow: 0 0 10px rgb(215 122 117 / 35%); vertical-align: middle; }
 .member-mini { display: grid; min-width: 0; justify-items: center; gap: 5px; padding: 7px 3px; border: 1px solid transparent; border-radius: 4px; background: transparent; cursor: pointer; }
 .member-mini:hover { border-color: rgb(123 228 227 / 18%); background: rgb(123 228 227 / 5%); }
 .member-mini .avatar { width: 30px; height: 30px; font-size: 9px; }
