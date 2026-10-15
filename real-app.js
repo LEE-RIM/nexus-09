@@ -17,6 +17,7 @@ let pendingRoom = null;
 let roomExpiryTimer;
 let presenceChannel;
 let messagesChannel;
+let powerRoomChannel;
 let inviteCreated = false;
 let pendingDestination = null;
 let toastTimer;
@@ -103,16 +104,10 @@ document.querySelector("#joinTab").addEventListener("click", () => setAuthTab("j
 document.querySelector("#ownerTab").addEventListener("click", () => setAuthTab("owner"));
 document.querySelector("#vipOpenPowerRoom").addEventListener("click", () => {
   if (["owner", "sub_owner"].includes(currentProfile?.role)) {
-    openDialog(document.querySelector("#roomsDialog"));
-    showToast("Private power room is ready.");
+    void openPowerRoom();
     return;
   }
   showToast("Only the owner team can access the power room.");
-});
-document.querySelector("#saveOwnerNote").addEventListener("click", () => {
-  const note = document.querySelector("#vipOwnerNote").value.trim();
-  localStorage.setItem("nexus09-owner-note", note || "Leadership access remains active for the team.");
-  showToast("Owner note saved.");
 });
 
 function showAuthError(message) {
@@ -314,6 +309,10 @@ async function loadRoster() {
     currentProfile = updatedCurrentProfile;
     document.querySelector("#profileButton small").textContent =
       `ID ${currentProfile.handle.toUpperCase()} · ${currentProfile.role.replace("_", " ").toUpperCase()}`;
+    if (!["owner", "sub_owner"].includes(currentProfile.role)) {
+      document.querySelector("#powerRoomDialog").close();
+      void removePowerRoomChannel();
+    }
     if (communityFeatures) await communityFeatures.initialize(currentProfile);
   }
   const total = count ?? roster.length;
@@ -421,6 +420,10 @@ function renderRoster(profiles) {
 }
 
 function renderVipSpotlight() {
+  const vipPanel = document.querySelector("#vipPanel");
+  const isOwnerTeam = ["owner", "sub_owner"].includes(currentProfile?.role);
+  vipPanel.hidden = !isOwnerTeam;
+  if (!isOwnerTeam) return;
   const owner = profilesCache.find((profile) => profile.role === "owner");
   const subOwner = profilesCache.find((profile) => profile.role === "sub_owner");
   const ownerName = document.querySelector("#vipOwnerName");
@@ -429,9 +432,6 @@ function renderVipSpotlight() {
   const subOwnerName = document.querySelector("#vipSubOwnerName");
   const subOwnerMeta = document.querySelector("#vipSubOwnerMeta");
   const subOwnerQuote = document.querySelector("#vipSubOwnerQuote");
-  const noteInput = document.querySelector("#vipOwnerNote");
-  const saveButton = document.querySelector("#saveOwnerNote");
-  const ownerTeam = ["owner", "sub_owner"].includes(currentProfile?.role);
 
   if (owner) {
     ownerName.textContent = owner.display_name;
@@ -453,11 +453,6 @@ function renderVipSpotlight() {
     subOwnerQuote.textContent = "Strategic access remains in standby until confirmed.";
   }
 
-  const savedNote = localStorage.getItem("nexus09-owner-note");
-  noteInput.value = savedNote || "Leadership access remains active for the team. Keep updates crisp and secure.";
-  noteInput.disabled = !ownerTeam;
-  saveButton.disabled = !ownerTeam;
-  noteInput.setAttribute("aria-label", ownerTeam ? "Owner quick note" : "Owner quick note (owner-only)");
 }
 
 function showMember(member) {
@@ -526,9 +521,10 @@ function subscribePresence() {
 }
 
 async function removeRealtimeChannels() {
-  const channels = [presenceChannel, messagesChannel].filter(Boolean);
+  const channels = [presenceChannel, messagesChannel, powerRoomChannel].filter(Boolean);
   presenceChannel = null;
   messagesChannel = null;
+  powerRoomChannel = null;
   for (const channel of channels) {
     const status = await supabase.removeChannel(channel);
     if (status !== "ok") console.error("Could not close a NEXUS-09 realtime channel.", status);
@@ -928,6 +924,138 @@ async function openChat() {
     showToast(friendlyError(error, "The group channel could not be loaded."));
   }
 }
+
+function powerRoomMessageElement(message) {
+  const profile = message.profiles || {};
+  const role = profile.role || "member";
+  const own = message.sender_id === currentProfile?.id;
+  const item = document.createElement("article");
+  item.className = `power-room-message${role === "owner" ? " is-main-owner" : " is-sub-owner"}${own ? " is-you" : ""}`;
+
+  const avatar = document.createElement("span");
+  avatar.className = `avatar ${role === "owner" ? "avatar-main-owner" : "avatar-sub-owner"}`;
+  avatar.textContent = role === "owner" ? "👑" : "💸";
+
+  const copy = document.createElement("div");
+  copy.className = "power-room-message-copy";
+  const heading = document.createElement("div");
+  heading.className = "power-room-message-heading";
+  const name = document.createElement("strong");
+  name.textContent = profile.display_name || "Owner team";
+  const badge = document.createElement("small");
+  badge.textContent = role === "owner" ? "✦ MAIN OWNER" : "💸 SUB-OWNER";
+  const time = document.createElement("time");
+  const date = new Date(message.created_at);
+  time.dateTime = date.toISOString();
+  time.textContent = new Intl.DateTimeFormat("en", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(date);
+  heading.append(name, badge, time);
+  const body = document.createElement("p");
+  body.textContent = message.body;
+  copy.append(heading, body);
+  item.append(avatar, copy);
+  return item;
+}
+
+async function loadPowerRoomMessages() {
+  if (!["owner", "sub_owner"].includes(currentProfile?.role)) {
+    throw new Error("Power Room is available only to the Main Owner and Sub-owner.");
+  }
+  const { data, error } = await supabase
+    .from("power_room_messages")
+    .select("id,body,created_at,sender_id,profiles!power_room_messages_sender_id_fkey(display_name,handle,role)")
+    .order("id", { ascending: false })
+    .limit(100);
+  if (error) throw error;
+  const messages = (data || []).reverse();
+  const thread = document.querySelector("#powerRoomThread");
+  if (!messages.length) {
+    const empty = document.createElement("p");
+    empty.className = "real-chat-empty";
+    empty.textContent = "No Power Room messages yet. Start a private conversation.";
+    thread.replaceChildren(empty);
+    return;
+  }
+  thread.replaceChildren(...messages.map(powerRoomMessageElement));
+  thread.scrollTop = thread.scrollHeight;
+}
+
+function subscribeToPowerRoom() {
+  if (powerRoomChannel || !["owner", "sub_owner"].includes(currentProfile?.role)) return;
+  powerRoomChannel = supabase
+    .channel("nexus09-power-room", { config: { private: true } })
+    .on("postgres_changes", {
+      event: "INSERT",
+      schema: "public",
+      table: "power_room_messages"
+    }, () => {
+      loadPowerRoomMessages().catch((error) => {
+        console.error("Could not refresh Power Room messages.", error);
+        showToast("A Power Room message arrived but the chat could not refresh.");
+      });
+    })
+    .subscribe((status) => {
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        console.error("NEXUS-09 Power Room channel failed.", status);
+        showToast("Power Room live chat disconnected. Check your connection.");
+      }
+    });
+}
+
+async function removePowerRoomChannel() {
+  if (!powerRoomChannel) return;
+  const channel = powerRoomChannel;
+  powerRoomChannel = null;
+  const status = await supabase.removeChannel(channel);
+  if (status !== "ok") console.error("Could not close the Power Room realtime channel.", status);
+}
+
+async function openPowerRoom() {
+  if (!["owner", "sub_owner"].includes(currentProfile?.role)) {
+    showToast("Only the Main Owner and Sub-owner can open Power Room.");
+    return;
+  }
+  try {
+    await loadPowerRoomMessages();
+    openDialog(document.querySelector("#powerRoomDialog"));
+    subscribeToPowerRoom();
+    window.setTimeout(() => document.querySelector("#powerRoomInput").focus(), 30);
+  } catch (error) {
+    console.error("Could not load Power Room messages.", error);
+    showToast(friendlyError(error, "Power Room could not be opened."));
+  }
+}
+
+document.querySelector("#powerRoomDialog").addEventListener("close", () => {
+  void removePowerRoomChannel();
+});
+
+document.querySelector("#powerRoomForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const input = document.querySelector("#powerRoomInput");
+  const text = input.value.trim();
+  if (!text || !currentProfile || !["owner", "sub_owner"].includes(currentProfile.role)) return;
+  const send = event.currentTarget.querySelector("button");
+  send.disabled = true;
+  try {
+    const { error } = await supabase.from("power_room_messages").insert({
+      sender_id: currentProfile.id,
+      body: text
+    });
+    if (error) throw error;
+    input.value = "";
+    await loadPowerRoomMessages();
+  } catch (error) {
+    console.error("Could not send a Power Room message.", error);
+    showToast(friendlyError(error, "Power Room message could not be sent."));
+  } finally {
+    send.disabled = false;
+  }
+});
 
 document.querySelector("#innerChatButton").addEventListener("click", openChat);
 document.querySelector("#innerRosterButton").addEventListener("click", () => openDialog(document.querySelector("#rosterDialog")));

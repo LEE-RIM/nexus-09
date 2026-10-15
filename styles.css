@@ -168,7 +168,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .members-panel .section-top h2 span { margin-left: 5px; color: #73828b; font: 9px var(--mono); }
 .member-strip { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 7px; margin: 16px 0 14px; }
 .vip-panel { margin-top: 15px; padding: 19px; border: 1px solid rgb(255 210 105 / 20%); border-radius: 5px; background: linear-gradient(135deg, rgba(30, 22, 9, 0.96), rgba(14, 18, 23, 0.96)); }
-.vip-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
+.vip-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
 .vip-card { min-width: 0; padding: 14px 15px; border: 1px solid rgba(255, 210, 105, 0.18); border-radius: 5px; background: rgba(255, 210, 105, 0.03); }
 .vip-card-sub-owner { border-color: rgba(174, 161, 255, 0.25); background: rgba(174, 161, 255, 0.04); }
 .vip-header { display: flex; align-items: center; gap: 10px; }
@@ -176,11 +176,7 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .vip-header small { color: #84939c; font: 7px var(--mono); }
 .vip-card p { margin: 12px 0 0; color: #b8c5cc; font-size: 10px; line-height: 1.6; }
 .vip-open-button { border-color: rgba(255, 210, 105, 0.25); color: #ffe29a; }
-.vip-note-box { display: grid; gap: 8px; padding: 14px; border: 1px solid rgba(123, 228, 227, 0.18); border-radius: 5px; background: rgba(10, 18, 23, 0.7); }
-.vip-note-box label { color: #9aa8b0; font: 7px var(--mono); letter-spacing: .7px; }
-.vip-note-box textarea { width: 100%; min-height: 94px; resize: vertical; padding: 10px 11px; border: 1px solid rgba(123, 228, 227, 0.18); border-radius: 4px; background: rgba(8, 12, 16, 0.9); color: #edf3f4; font: 10px/1.5 "DM Sans", sans-serif; }
-.vip-note-box textarea::placeholder { color: #6d7f87; }
-.vip-note-box .outline-button { justify-self: end; }
+.vip-open-button { min-height: 38px; }
 .member-mini { display: grid; min-width: 0; justify-items: center; gap: 5px; padding: 7px 3px; border: 1px solid transparent; border-radius: 4px; background: transparent; cursor: pointer; }
 .member-mini:hover { border-color: rgb(123 228 227 / 18%); background: rgb(123 228 227 / 5%); }
 .member-mini .avatar { width: 30px; height: 30px; font-size: 9px; }
@@ -291,6 +287,25 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .chat-compose input { min-width: 0; height: 39px; flex: 1; padding: 0 12px; border: 1px solid #2a3a43; border-radius: 4px; background: #0a1015; color: #dce7e8; font-size: 9px; }
 .chat-compose input::placeholder { color: #607078; }
 .chat-compose button { width: 39px; border: 1px solid rgb(123 228 227 / 36%); border-radius: 4px; background: rgb(123 228 227 / 9%); color: var(--cyan); font-size: 17px; cursor: pointer; }
+.power-room-dot { display: inline-block; width: 6px; height: 6px; margin-right: 6px; border-radius: 50%; background: #c6b9ff; box-shadow: 0 0 9px rgb(174 161 255 / 70%); }
+.power-room-copy { margin: 10px 0 0; }
+.power-room-thread { display: flex; min-height: 280px; max-height: min(48vh, 560px); flex-direction: column; gap: 12px; margin-top: 16px; padding: 14px; overflow-y: auto; border: 1px solid rgb(174 161 255 / 20%); border-radius: 5px; background: radial-gradient(ellipse at top right, rgb(174 161 255 / 5%), transparent 55%), rgb(7 11 15 / 72%); }
+.power-room-message { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 9px; padding: 9px; border: 1px solid rgb(174 161 255 / 12%); border-radius: 5px; background: rgb(174 161 255 / 3%); }
+.power-room-message .avatar { width: 29px; height: 29px; font-size: 10px; }
+.power-room-message.is-main-owner { border-color: rgb(255 210 105 / 22%); background: linear-gradient(100deg, rgb(255 210 105 / 5%), transparent 75%); }
+.power-room-message.is-sub-owner { border-color: rgb(174 161 255 / 22%); background: linear-gradient(100deg, rgb(174 161 255 / 6%), transparent 75%); }
+.power-room-message-copy { min-width: 0; }
+.power-room-message-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
+.power-room-message-heading strong { color: #e5e4ee; font: 8px var(--mono); }
+.power-room-message.is-main-owner .power-room-message-heading strong { color: #ffe29a; }
+.power-room-message.is-sub-owner .power-room-message-heading strong { color: #c9c0ff; }
+.power-room-message-heading small { color: #a69ce0; font: 6px var(--mono); }
+.power-room-message-heading time { margin-left: auto; color: #71808a; font: 6px var(--mono); }
+.power-room-message-copy p { margin: 5px 0 0; color: #c0c6ca; font-size: 10px; line-height: 1.55; overflow-wrap: anywhere; white-space: pre-wrap; }
+.power-room-compose { margin-top: 10px; }
+.power-room-compose input { min-height: 42px; }
+.power-room-compose button { border-color: rgb(174 161 255 / 40%); background: rgb(174 161 255 / 10%); color: #c9c0ff; }
+.power-room-dialog .chat-demo-note { margin-top: 9px; }
 .chat-demo-note { margin: 9px 0 0; color: #66757d; font: 6px var(--mono); letter-spacing: .5px; }
 .room-switch-button { min-height: 27px; padding: 0 8px; font-size: 7px; letter-spacing: .45px; }
 .room-list, .managed-room-list { display: flex; flex-direction: column; gap: 7px; margin-top: 15px; }
@@ -456,6 +471,15 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
   .room-ambient { right: 22px; }
   .chat-layout { grid-template-columns: 1fr; }
   .chat-thread { height: 270px; }
+  .vip-panel { padding: 14px; }
+  .vip-grid { grid-template-columns: 1fr; gap: 9px; }
+  .vip-card { padding: 12px; }
+  .vip-open-button { font-size: 7px; }
+  .power-room-dialog { width: calc(100% - 16px); max-height: 92dvh; }
+  .power-room-thread { min-height: 34dvh; max-height: 48dvh; padding: 10px; }
+  .power-room-message { grid-template-columns: 27px minmax(0, 1fr); gap: 7px; padding: 8px; }
+  .power-room-message .avatar { width: 26px; height: 26px; }
+  .power-room-message-copy p { font-size: 11px; }
   .chat-aside { display: none; }
   .dm-layout { grid-template-columns: 1fr; }
   .dm-conversations { max-height: 88px; flex-direction: row; }

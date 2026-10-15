@@ -167,8 +167,8 @@
           </article>
         </section>
 
-        <section class="vip-panel" id="vipPanel" aria-live="polite">
-          <div class="section-top"><div><p class="overline">OWNER TEAM</p><h2>VIP spotlight</h2></div><button class="secondary-button vip-open-button" id="vipOpenPowerRoom" type="button">OPEN POWER ROOM</button></div>
+        <section class="vip-panel" id="vipPanel" aria-live="polite" hidden>
+          <div class="section-top"><div><p class="overline">OWNER TEAM · PRIVATE</p><h2>VIP spotlight</h2></div><button class="secondary-button vip-open-button" id="vipOpenPowerRoom" type="button">OPEN POWER ROOM <span>→</span></button></div>
           <div class="vip-grid">
             <article class="vip-card vip-card-owner">
               <div class="vip-header">
@@ -182,7 +182,7 @@
             </article>
             <article class="vip-card vip-card-sub-owner">
               <div class="vip-header">
-                <span class="avatar avatar-sub-owner" id="vipSubOwnerAvatar">◆</span>
+                <span class="avatar avatar-sub-owner" id="vipSubOwnerAvatar">💸</span>
                 <div>
                   <strong id="vipSubOwnerName">Sub-owner</strong>
                   <small id="vipSubOwnerMeta">No sub-owner assigned yet</small>
@@ -190,11 +190,6 @@
               </div>
               <p id="vipSubOwnerQuote">Strategic access remains in standby until confirmed.</p>
             </article>
-            <div class="vip-note-box">
-              <label for="vipOwnerNote">Owner quick note</label>
-              <textarea id="vipOwnerNote" rows="4" maxlength="180" placeholder="Ship the next briefing before the end of the day."></textarea>
-              <button class="outline-button" id="saveOwnerNote" type="button">SAVE NOTE</button>
-            </div>
           </div>
         </section>
         <footer class="workspace-footer"><span>NEXUS-09 <b>·</b> PRIVATE BY INVITATION</span><span>A PLACE FOR THE CURIOUS <b>✳</b></span></footer>
@@ -288,6 +283,22 @@
         </div>
         <form class="chat-compose" id="chatForm"><label class="visually-hidden" for="chatInput">Write a message</label><input id="chatInput" maxlength="500" autocomplete="off" placeholder="Send a message to the group…"><button type="submit" aria-label="Send message">↑</button></form>
         <p class="chat-demo-note">DEMO ONLY — other visitors will not see these messages.</p>
+      </div>
+    </dialog>
+
+    <dialog class="app-dialog wide-dialog power-room-dialog" id="powerRoomDialog">
+      <div class="dialog-shell content-shell">
+        <button class="dialog-close" data-close type="button" aria-label="Close dialog">×</button>
+        <p class="overline"><span class="power-room-dot"></span> OWNER TEAM ONLY <span class="slash">/</span> PERMANENT CHANNEL</p>
+        <h2>Power Room <span class="channel-live"><i></i> PRIVATE</span></h2>
+        <p class="dialog-copy power-room-copy">A private chat for the Main Owner and Sub-owner. Access stays active while you hold an owner-team role; no 30-minute room code is needed.</p>
+        <div class="power-room-thread" id="powerRoomThread" aria-live="polite"><p class="feature-empty">Loading private messages…</p></div>
+        <form class="chat-compose power-room-compose" id="powerRoomForm">
+          <label class="visually-hidden" for="powerRoomInput">Write a private Power Room message</label>
+          <input id="powerRoomInput" maxlength="500" autocomplete="off" placeholder="Message the owner team…" required>
+          <button type="submit" aria-label="Send Power Room message">↑</button>
+        </form>
+        <p class="chat-demo-note">POWER ROOM HISTORY DOES NOT EXPIRE WITH STANDARD ROOM ACCESS.</p>
       </div>
     </dialog>
 
