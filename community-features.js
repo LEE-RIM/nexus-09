@@ -1,3 +1,5 @@
+import { createReplyAction, createReplyPreview, createReplyQuote, loadReplyTargets } from "./chat-replies.js";
+
 export function addReactionControls(container, {
   supabase, messageId, kind, reactions, userId, refresh, showToast
 }) {
@@ -131,6 +133,7 @@ export function initCommunityFeatures({
   let reportsChannel;
   let reportTarget;
   let reportReturnDialog;
+  let pendingDirectReply;
   let isBound = false;
 
   const announcementList = document.querySelector("#announcementsList");
@@ -500,6 +503,7 @@ export function initCommunityFeatures({
   }
 
   async function selectConversation(conversationId, other) {
+    if (activeDirectConversation !== conversationId) setDirectReply(null);
     activeDirectConversation = conversationId;
     document.querySelector("#dmConversationTitle").textContent = other?.display_name
       ? `Private conversation with ${other.display_name}`
@@ -540,7 +544,7 @@ export function initCommunityFeatures({
     if (!activeDirectConversation || !profile) return;
     const { data, error } = await supabase
       .from("direct_messages")
-      .select("id,conversation_id,sender_id,body,created_at,profiles!direct_messages_sender_id_fkey(display_name,handle,role)")
+      .select("id,conversation_id,sender_id,body,created_at,reply_to_id,profiles!direct_messages_sender_id_fkey(display_name,handle,role)")
       .eq("conversation_id", activeDirectConversation)
       .order("id", { ascending: false })
       .limit(100);
@@ -550,6 +554,8 @@ export function initCommunityFeatures({
       return;
     }
     const messages = (data || []).reverse();
+    const replyTargets = await loadReplyTargets(supabase, "direct_messages", "direct_messages_sender_id_fkey", messages);
+    for (const message of messages) message.replyTo = replyTargets.get(message.reply_to_id) || null;
     const ids = messages.map((message) => message.id);
     let reactions = [];
     if (ids.length) {
@@ -578,6 +584,7 @@ export function initCommunityFeatures({
       addReportButton(item.querySelector(".chat-message-heading"), {
         kind: "direct", messageId: message.id, body: message.body, openReport
       });
+      item.querySelector(".chat-message-copy").append(createReplyAction(() => setDirectReply(message)));
       return item;
     }));
     dmThread.scrollTop = dmThread.scrollHeight;
@@ -595,16 +602,30 @@ export function initCommunityFeatures({
       const { error } = await supabase.from("direct_messages").insert({
         conversation_id: activeDirectConversation,
         sender_id: profile.id,
-        body
+        body,
+        reply_to_id: pendingDirectReply?.id ?? null
       });
       if (error) throw error;
       input.value = "";
+      setDirectReply(null);
       await loadDirectMessages();
     } catch (error) {
       console.error("Could not send a NEXUS-09 private message.", error);
       showToast("Private message could not be sent. You may be temporarily muted.");
     } finally {
       button.disabled = false;
+    }
+
+  }
+
+  function setDirectReply(message) {
+    pendingDirectReply = message;
+    const container = document.querySelector("#dmReplyPreview");
+    container.replaceChildren();
+    container.hidden = !message;
+    if (message) {
+      container.append(createReplyPreview(message, () => setDirectReply(null)));
+      document.querySelector("#dmInput").focus();
     }
   }
 
@@ -781,6 +802,7 @@ export function initCommunityFeatures({
     initializedFor = null;
     initializedRole = null;
     activeDirectConversation = null;
+    setDirectReply(null);
     const channels = [directChannel, directInboxChannel, announcementsChannel, reportsChannel].filter(Boolean);
     directChannel = null;
     directInboxChannel = null;
@@ -823,6 +845,7 @@ function createMessageElement(message, currentProfile) {
         : ["violet", "amber", "rose", "blue", "green"][Array.from(profile.handle || "").reduce((sum, char) => sum + char.charCodeAt(0), 0) % 5];
   const item = document.createElement("article");
   item.className = `chat-message${own ? " is-you" : ""}${roleClass ? ` ${roleClass}` : ""}`;
+  item.id = `direct-message-${message.id}`;
   const avatar = document.createElement("span");
   avatar.className = `avatar avatar-${color}`;
   avatar.textContent = role === "owner"
@@ -851,7 +874,15 @@ function createMessageElement(message, currentProfile) {
   const body = document.createElement("p");
   body.textContent = message.body;
   heading.append(time);
-  copy.append(heading, body);
+  copy.append(heading);
+  if (message.replyTo) {
+    const quote = createReplyQuote(message.replyTo, () => {
+      document.getElementById(`direct-message-${message.replyTo.id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      dmThread.focus({ preventScroll: true });
+    });
+    copy.append(quote);
+  }
+  copy.append(body);
   item.append(avatar, copy);
   return item;
 }

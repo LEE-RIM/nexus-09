@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { addReactionControls, addReportButton, initCommunityFeatures } from "./community-features.js";
+import { createReplyAction, createReplyPreview, createReplyQuote, loadReplyTargets } from "./chat-replies.js";
 
 const settings = window.NEXUS_CONFIG;
 const supabase = createClient(settings.supabaseUrl, settings.supabaseAnonKey, {
@@ -26,6 +27,8 @@ let memberInitializing = false;
 let profilesCache = [];
 let communityFeatures;
 let qrCodeModulePromise;
+let pendingGroupReply = null;
+let pendingPowerRoomReply = null;
 
 document.body.classList.add("real-mode");
 const demoBanner = document.querySelector(".demo-banner");
@@ -795,6 +798,7 @@ async function unlockRoom(roomId, roomCode) {
     const status = await supabase.removeChannel(previousChannel);
     if (status !== "ok") console.error("Could not close the previous NEXUS-09 room channel.", status);
   }
+  if (activeRoom?.id !== pendingRoom.id) setReplyDraft("group", null);
   activeRoom = pendingRoom;
   pendingRoom = null;
   roomUnlockedUntil = expiresAt;
@@ -803,6 +807,7 @@ async function unlockRoom(roomId, roomCode) {
   roomExpiryTimer = window.setTimeout(() => {
     roomUnlockedUntil = 0;
     activeRoom = null;
+    setReplyDraft("group", null);
     const channel = messagesChannel;
     messagesChannel = null;
     if (channel) {
@@ -896,6 +901,7 @@ async function archiveRoom(roomId) {
     if (activeRoom?.id === roomId) {
       roomUnlockedUntil = 0;
       activeRoom = null;
+      setReplyDraft("group", null);
       if (messagesChannel) {
         const channel = messagesChannel;
         messagesChannel = null;
@@ -961,6 +967,7 @@ function messageElement(message, reactions = []) {
         : ["violet", "amber", "rose", "blue", "green"][Array.from(profile.handle || "").reduce((sum, char) => sum + char.charCodeAt(0), 0) % 5];
   const item = document.createElement("article");
   item.className = `chat-message${own ? " is-you" : ""}${roleClass ? ` ${roleClass}` : ""}`;
+  item.id = `group-message-${message.id}`;
   const avatar = document.createElement("span");
   avatar.className = `avatar avatar-${color}`;
   avatar.textContent = role === "owner"
@@ -989,7 +996,11 @@ function messageElement(message, reactions = []) {
   const body = document.createElement("p");
   body.textContent = message.body;
   heading.append(time);
-  copy.append(heading, body);
+  copy.append(heading);
+  if (message.replyTo) {
+    copy.append(createReplyQuote(message.replyTo, () => scrollToMessage("chatThread", "group-message", message.replyTo.id)));
+  }
+  copy.append(body);
   addReactionControls(copy, {
     supabase,
     messageId: message.id,
@@ -1007,8 +1018,28 @@ function messageElement(message, reactions = []) {
       openReport: communityFeatures.openReport
     });
   }
+  copy.append(createReplyAction(() => setReplyDraft("group", message)));
   item.append(avatar, copy);
   return item;
+}
+
+function scrollToMessage(threadId, messagePrefix, messageId) {
+  document.getElementById(`${messagePrefix}-${messageId}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  document.getElementById(threadId)?.focus({ preventScroll: true });
+}
+
+function setReplyDraft(kind, message) {
+  const isPowerRoom = kind === "power";
+  const container = document.querySelector(isPowerRoom ? "#powerRoomReplyPreview" : "#groupReplyPreview");
+  const input = document.querySelector(isPowerRoom ? "#powerRoomInput" : "#chatInput");
+  if (isPowerRoom) pendingPowerRoomReply = message;
+  else pendingGroupReply = message;
+  container.replaceChildren();
+  container.hidden = !message;
+  if (message) {
+    container.append(createReplyPreview(message, () => setReplyDraft(kind, null)));
+    input.focus();
+  }
 }
 
 function renderMessages(messages) {
@@ -1027,12 +1058,14 @@ async function loadMessages() {
   if (!activeRoom || roomUnlockedUntil <= Date.now()) throw new Error("Room access expired. Choose a room and enter its code again.");
   const { data, error } = await supabase
     .from("messages")
-    .select("id,body,created_at,sender_id,profiles!messages_sender_id_fkey(display_name,handle,role)")
+    .select("id,body,created_at,sender_id,reply_to_id,profiles!messages_sender_id_fkey(display_name,handle,role)")
     .eq("room_id", activeRoom.id)
     .order("id", { ascending: false })
     .limit(100);
   if (error) throw error;
   const messages = (data || []).reverse();
+  const replyTargets = await loadReplyTargets(supabase, "messages", "messages_sender_id_fkey", messages);
+  for (const message of messages) message.replyTo = replyTargets.get(message.reply_to_id) || null;
   const ids = messages.map((message) => message.id);
   let reactions = [];
   if (ids.length) {
@@ -1095,6 +1128,7 @@ function powerRoomMessageElement(message) {
   const role = profile.role || "member";
   const own = message.sender_id === currentProfile?.id;
   const item = document.createElement("article");
+  item.id = `power-message-${message.id}`;
   const pinned = message.id === pinnedPowerRoomMessageId;
   item.className = `power-room-message${role === "owner" ? " is-main-owner" : " is-sub-owner"}${own ? " is-you" : ""}${pinned ? " is-pinned" : ""}`;
 
@@ -1122,6 +1156,9 @@ function powerRoomMessageElement(message) {
   heading.append(name, badge, time);
   const body = document.createElement("p");
   body.textContent = message.body;
+  const replyQuote = message.replyTo
+    ? createReplyQuote(message.replyTo, () => scrollToMessage("powerRoomThread", "power-message", message.replyTo.id))
+    : null;
   const pinButton = document.createElement("button");
   pinButton.className = "power-room-pin-action";
   pinButton.type = "button";
@@ -1136,7 +1173,9 @@ function powerRoomMessageElement(message) {
       pinButton.disabled = false;
     });
   });
-  copy.append(heading, body, pinButton);
+  copy.append(heading);
+  if (replyQuote) copy.append(replyQuote);
+  copy.append(body, createReplyAction(() => setReplyDraft("power", message)), pinButton);
   item.append(avatar, copy);
   return item;
 }
@@ -1147,7 +1186,7 @@ async function loadPowerRoomMessages() {
   }
   const { data, error } = await supabase
     .from("power_room_messages")
-    .select("id,body,created_at,sender_id,profiles!power_room_messages_sender_id_fkey(display_name,handle,role)")
+    .select("id,body,created_at,sender_id,reply_to_id,profiles!power_room_messages_sender_id_fkey(display_name,handle,role)")
     .order("id", { ascending: false })
     .limit(100);
   if (error) throw error;
@@ -1163,13 +1202,15 @@ async function loadPowerRoomMessages() {
   if (pin && !pinnedMessage) {
     const result = await supabase
       .from("power_room_messages")
-      .select("id,body,created_at,sender_id,profiles!power_room_messages_sender_id_fkey(display_name,handle,role)")
+      .select("id,body,created_at,sender_id,reply_to_id,profiles!power_room_messages_sender_id_fkey(display_name,handle,role)")
       .eq("id", pin.message_id)
       .maybeSingle();
     if (result.error) throw result.error;
     pinnedMessage = result.data || null;
     if (pinnedMessage) messages = [...messages, pinnedMessage].sort((a, b) => a.id - b.id);
   }
+  const replyTargets = await loadReplyTargets(supabase, "power_room_messages", "power_room_messages_sender_id_fkey", messages);
+  for (const message of messages) message.replyTo = replyTargets.get(message.reply_to_id) || null;
   renderPowerRoomPin(pinnedMessage, pin);
   const thread = document.querySelector("#powerRoomThread");
   if (!messages.length) {
@@ -1351,10 +1392,12 @@ document.querySelector("#powerRoomForm").addEventListener("submit", async (event
   try {
     const { error } = await supabase.from("power_room_messages").insert({
       sender_id: currentProfile.id,
-      body: text
+      body: text,
+      reply_to_id: pendingPowerRoomReply?.id ?? null
     });
     if (error) throw error;
     input.value = "";
+    setReplyDraft("power", null);
     await loadPowerRoomMessages();
     await markPowerRoomRead();
   } catch (error) {
@@ -1380,10 +1423,12 @@ document.querySelector("#chatForm").addEventListener("submit", async (event) => 
     const { error } = await supabase.from("messages").insert({
       sender_id: currentProfile.id,
       room_id: activeRoom.id,
-      body: text
+      body: text,
+      reply_to_id: pendingGroupReply?.id ?? null
     });
     if (error) throw error;
     input.value = "";
+    setReplyDraft("group", null);
     await loadMessages();
   } catch (error) {
     console.error("Could not send NEXUS-09 message.", error);
@@ -1461,6 +1506,8 @@ async function signOutMember() {
   roomUnlockedUntil = 0;
   activeRoom = null;
   pendingRoom = null;
+  setReplyDraft("group", null);
+  setReplyDraft("power", null);
   pendingDestination = null;
   window.clearTimeout(roomExpiryTimer);
   await removeRealtimeChannels();
@@ -1492,6 +1539,8 @@ async function start() {
       roomUnlockedUntil = 0;
       activeRoom = null;
       pendingRoom = null;
+      setReplyDraft("group", null);
+      setReplyDraft("power", null);
       pendingDestination = null;
       window.clearTimeout(roomExpiryTimer);
       void removeRealtimeChannels();

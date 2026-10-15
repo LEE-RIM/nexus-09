@@ -278,9 +278,10 @@
         <p class="overline"><span class="tiny-dot"></span> ENCRYPTED CHANNEL <span class="slash">/</span> <span id="activeRoomName">#INNER-CIRCLE</span></p>
         <h2>Group channel <button class="secondary-button room-switch-button" id="switchRoomButton" type="button" hidden>SWITCH ROOM</button><span class="channel-live"><i></i> DEMO</span></h2>
         <div class="chat-layout">
-          <div class="chat-thread" id="chatThread" aria-live="polite"></div>
+          <div class="chat-thread" id="chatThread" tabindex="0" aria-live="polite"></div>
           <aside class="chat-aside"><strong>CHANNEL INFO</strong><span>24 members</span><span>Messages in this preview are saved only in this browser.</span><div class="chat-aside-line"></div><span class="chat-aside-status"><i></i> PRIVATE DEMO</span></aside>
         </div>
+        <div class="reply-compose-slot" id="groupReplyPreview" hidden></div>
         <form class="chat-compose" id="chatForm"><label class="visually-hidden" for="chatInput">Write a message</label><input id="chatInput" maxlength="500" autocomplete="off" placeholder="Send a message to the group…"><button type="submit" aria-label="Send message">↑</button></form>
         <p class="chat-demo-note">DEMO ONLY — other visitors will not see these messages.</p>
       </div>
@@ -293,7 +294,8 @@
         <h2>Power Room <span class="channel-live"><i></i> PRIVATE</span></h2>
         <p class="dialog-copy power-room-copy">A private chat for the Main Owner and Sub-owner. Access stays active while you hold an owner-team role; no 30-minute room code is needed.</p>
         <aside class="power-room-pin" id="powerRoomPin" aria-live="polite" hidden></aside>
-        <div class="power-room-thread" id="powerRoomThread" aria-live="polite"><p class="feature-empty">Loading private messages…</p></div>
+        <div class="power-room-thread" id="powerRoomThread" tabindex="0" aria-live="polite"><p class="feature-empty">Loading private messages…</p></div>
+        <div class="reply-compose-slot" id="powerRoomReplyPreview" hidden></div>
         <form class="chat-compose power-room-compose" id="powerRoomForm">
           <label class="visually-hidden" for="powerRoomInput">Write a private Power Room message</label>
           <input id="powerRoomInput" maxlength="500" autocomplete="off" placeholder="Message the owner team…" required>
@@ -366,7 +368,8 @@
           <nav class="dm-conversations" id="dmConversationList" aria-label="Conversations"><p class="feature-empty">Loading conversations…</p></nav>
           <section class="dm-thread-panel" aria-label="Direct message conversation">
             <h3 id="dmConversationTitle">Choose a member to start a private conversation</h3>
-            <div class="chat-thread dm-thread" id="dmThread" aria-live="polite"></div>
+            <div class="chat-thread dm-thread" id="dmThread" tabindex="0" aria-live="polite"></div>
+            <div class="reply-compose-slot" id="dmReplyPreview" hidden></div>
             <form class="chat-compose" id="dmForm"><label class="visually-hidden" for="dmInput">Write a private message</label><input id="dmInput" maxlength="500" autocomplete="off" placeholder="Send a private message…" disabled><button type="submit" aria-label="Send private message" disabled>↑</button></form>
             <p class="chat-demo-note">Only the two participants can read messages here. Reporting a message shares its text with the facility owner for review.</p>
           </section>

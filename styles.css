@@ -280,6 +280,17 @@ button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid 
 .chat-message-heading time { color: #63717b; font: 6px var(--mono); }
 .chat-message-copy p { margin: 4px 0 0; color: #a0aaae; font-size: 9px; line-height: 1.55; overflow-wrap: anywhere; }
 .chat-message.is-you .chat-message-heading strong { color: var(--cyan); }
+.message-reply-quote { display: grid; width: 100%; gap: 3px; margin: 6px 0; padding: 7px 9px; border: 0; border-left: 2px solid var(--cyan-dim); border-radius: 0 3px 3px 0; background: rgb(123 228 227 / 5%); text-align: left; cursor: pointer; }
+.message-reply-quote strong { overflow: hidden; color: #8edbd4; font: 7px var(--mono); text-overflow: ellipsis; white-space: nowrap; }
+.message-reply-quote span { display: -webkit-box; overflow: hidden; color: #839399; font-size: 8px; line-height: 1.45; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.message-reply-button { width: fit-content; margin-top: 5px; padding: 2px 0; border: 0; background: transparent; color: #7c969b; font: 7px var(--mono); cursor: pointer; }
+.message-reply-button:hover, .message-reply-quote:hover strong { color: var(--cyan); }
+.reply-compose-slot:not([hidden]) { margin-top: 9px; }
+.reply-compose-preview { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid rgb(123 228 227 / 19%); border-left: 2px solid var(--cyan-dim); border-radius: 4px; background: rgb(123 228 227 / 4%); }
+.reply-compose-copy { display: grid; min-width: 0; flex: 1; gap: 3px; }
+.reply-compose-copy strong { color: #89d6ce; font: 7px var(--mono); }
+.reply-compose-copy span { overflow: hidden; color: #849399; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.reply-cancel-button { width: 27px; height: 27px; border: 1px solid var(--line); border-radius: 4px; background: #111a21; color: #9caaaf; font-size: 17px; cursor: pointer; }
 .chat-aside { display: flex; flex-direction: column; gap: 12px; padding: 13px; border: 1px solid var(--line); border-radius: 4px; background: rgb(18 26 33 / 60%); }
 .chat-aside > strong { color: #8c9aa0; font: 7px var(--mono); letter-spacing: .7px; }
 .chat-aside > span { color: #7b8991; font-size: 8px; line-height: 1.55; }
