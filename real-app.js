@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { addReactionControls, addReportButton, initCommunityFeatures } from "./community-features.js";
+import { addDeleteMessageButton, addReactionControls, addReportButton, initCommunityFeatures } from "./community-features.js";
 import { createReplyAction, createReplyPreview, createReplyQuote, loadReplyTargets } from "./chat-replies.js";
 
 const settings = window.NEXUS_CONFIG;
@@ -17,13 +17,15 @@ let activeRoom = null;
 let pendingRoom = null;
 let pinnedPowerRoomMessageId = null;
 let roomExpiryTimer;
+let powerRoomExpiryTimer;
+let powerRoomExpiresAt = 0;
 let presenceChannel;
 let messagesChannel;
 let powerRoomChannel;
 let inviteCreated = false;
 let pendingDestination = null;
 let toastTimer;
-let memberInitializing = false;
+let memberInitializationPromise = null;
 let profilesCache = [];
 let communityFeatures;
 let qrCodeModulePromise;
@@ -109,7 +111,10 @@ document.querySelector("#joinTab").addEventListener("click", () => setAuthTab("j
 document.querySelector("#ownerTab").addEventListener("click", () => setAuthTab("owner"));
 document.querySelector("#vipOpenPowerRoom").addEventListener("click", () => {
   if (["owner", "sub_owner"].includes(currentProfile?.role)) {
-    void openPowerRoom();
+    openDialog(document.querySelector("#powerRoomAccessDialog"));
+    document.querySelector("#powerRoomAccessError").textContent = "";
+    document.querySelector("#powerRoomAccessCode").value = "";
+    window.setTimeout(() => document.querySelector("#powerRoomAccessCode").focus(), 30);
     return;
   }
   showToast("Only the owner team can access the power room.");
@@ -152,11 +157,24 @@ async function signIn(handle, secretCode) {
   const normalizedHandle = handle.trim().toLowerCase();
   if (!/^[a-z0-9_]{3,20}$/.test(normalizedHandle)) throw new Error("Member IDs use 3–20 letters, numbers, or underscores.");
   if (secretCode.length < 12) throw new Error("Your secret code must contain at least 12 characters.");
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email: `${normalizedHandle}@members.nexus09.invalid`,
     password: secretCode
   });
   if (error) throw new Error("Member ID or secret code was not accepted.");
+  if (!data.user) throw new Error("Sign-in completed without an account session. Please try again.");
+  try {
+    await initializeMember(data.user);
+  } catch (initializationError) {
+    currentProfile = null;
+    profilesCache = [];
+    appShell.hidden = true;
+    authScreen.hidden = false;
+    document.querySelector("#profileButton").hidden = true;
+    const { error: signOutError } = await supabase.auth.signOut();
+    if (signOutError) console.error("Could not clear the incomplete NEXUS-09 sign-in.", signOutError);
+    throw initializationError;
+  }
 }
 
 document.querySelector("#loginForm").addEventListener("submit", async (event) => {
@@ -237,68 +255,71 @@ function showToast(message) {
   toastTimer = window.setTimeout(() => toast.classList.remove("visible"), 3500);
 }
 
-async function initializeMember(user) {
-  if (currentProfile || memberInitializing) return;
-  memberInitializing = true;
-  try {
-    const { data: profile, error } = await supabase
-      .from("profiles")
-      .select("id,handle,display_name,role,created_at")
-      .eq("id", user.id)
-      .maybeSingle();
-    if (error) throw error;
-    if (!profile) throw new Error("This account is not on the NEXUS-09 roster. Ask a member for a valid invite.");
-    currentProfile = profile;
-    authScreen.hidden = true;
-    appShell.hidden = false;
-    document.querySelector("#profileButton").hidden = false;
-    document.querySelector(".heading-row h1 em").textContent = profile.display_name + ".";
-    document.querySelector("#profileButton strong").textContent = profile.display_name.toUpperCase();
-    document.querySelector("#profileButton small").textContent =
-      `ID ${profile.handle.toUpperCase()} · ${profile.role.replace("_", " ").toUpperCase()}`;
-    const profileAvatar = document.querySelector("#profileButton .avatar");
-    profileAvatar.classList.toggle("avatar-main-owner", profile.role === "owner");
-    profileAvatar.classList.toggle("avatar-sub-owner", profile.role === "sub_owner");
-    profileAvatar.textContent = profile.role === "owner"
-      ? "👑"
-      : profile.role === "sub_owner"
-        ? "♛"
-        : profile.display_name.trim().charAt(0).toUpperCase();
-    document.querySelector("#profileButton").setAttribute("aria-label", "Account options for " + profile.display_name);
-    const topbar = document.querySelector(".topbar");
-    if (!document.querySelector("#signOutButton")) {
-      const signOut = document.createElement("button");
-      signOut.className = "sign-out";
-      signOut.id = "signOutButton";
-      signOut.type = "button";
-      signOut.textContent = "SIGN OUT";
-      signOut.addEventListener("click", signOutMember);
-      topbar.append(signOut);
-    }
-    document.querySelector("#onlineCount").textContent = "—";
-    document.querySelector("#labAccessCode").value = "";
-    await loadRoster();
-    openScannedMemberProfile();
-    if (!communityFeatures) {
-      communityFeatures = initCommunityFeatures({
-        supabase,
-        getCurrentProfile: () => currentProfile,
-        getMembers: () => profilesCache,
-        showToast,
-        openDialog,
-        refreshMembers: loadRoster,
-        updateCurrentProfile: (updatedProfile) => {
-          currentProfile = updatedProfile;
-          document.querySelector("#profileButton small").textContent =
-            `ID ${updatedProfile.handle.toUpperCase()} · ${updatedProfile.role.replace("_", " ").toUpperCase()}`;
-        }
-      });
-    }
-    await communityFeatures.initialize(profile);
-    subscribePresence();
-  } finally {
-    memberInitializing = false;
+function initializeMember(user) {
+  if (currentProfile) return Promise.resolve();
+  if (memberInitializationPromise) return memberInitializationPromise;
+  memberInitializationPromise = initializeMemberProfile(user).finally(() => {
+    memberInitializationPromise = null;
+  });
+  return memberInitializationPromise;
+}
+
+async function initializeMemberProfile(user) {
+  const { data: profile, error } = await supabase
+    .from("profiles")
+    .select("id,handle,display_name,role,created_at")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (error) throw error;
+  if (!profile) throw new Error("This account is not on the NEXUS-09 roster. Ask a member for a valid invite.");
+  currentProfile = profile;
+  authScreen.hidden = true;
+  appShell.hidden = false;
+  document.querySelector("#profileButton").hidden = false;
+  document.querySelector(".heading-row h1 em").textContent = profile.display_name + ".";
+  document.querySelector("#profileButton strong").textContent = profile.display_name.toUpperCase();
+  document.querySelector("#profileButton small").textContent =
+    `ID ${profile.handle.toUpperCase()} · ${profile.role.replace("_", " ").toUpperCase()}`;
+  const profileAvatar = document.querySelector("#profileButton .avatar");
+  profileAvatar.classList.toggle("avatar-main-owner", profile.role === "owner");
+  profileAvatar.classList.toggle("avatar-sub-owner", profile.role === "sub_owner");
+  profileAvatar.textContent = profile.role === "owner"
+    ? "👑"
+    : profile.role === "sub_owner"
+      ? "♛"
+      : profile.display_name.trim().charAt(0).toUpperCase();
+  document.querySelector("#profileButton").setAttribute("aria-label", "Account options for " + profile.display_name);
+  const topbar = document.querySelector(".topbar");
+  if (!document.querySelector("#signOutButton")) {
+    const signOut = document.createElement("button");
+    signOut.className = "sign-out";
+    signOut.id = "signOutButton";
+    signOut.type = "button";
+    signOut.textContent = "SIGN OUT";
+    signOut.addEventListener("click", signOutMember);
+    topbar.append(signOut);
   }
+  document.querySelector("#onlineCount").textContent = "—";
+  document.querySelector("#labAccessCode").value = "";
+  await loadRoster();
+  openScannedMemberProfile();
+  if (!communityFeatures) {
+    communityFeatures = initCommunityFeatures({
+      supabase,
+      getCurrentProfile: () => currentProfile,
+      getMembers: () => profilesCache,
+      showToast,
+      openDialog,
+      refreshMembers: loadRoster,
+      updateCurrentProfile: (updatedProfile) => {
+        currentProfile = updatedProfile;
+        document.querySelector("#profileButton small").textContent =
+          `ID ${updatedProfile.handle.toUpperCase()} · ${updatedProfile.role.replace("_", " ").toUpperCase()}`;
+      }
+    });
+  }
+  await communityFeatures.initialize(profile);
+  subscribePresence();
 }
 
 async function loadRoster() {
@@ -511,12 +532,9 @@ function showMember(member) {
   card.classList.toggle("is-main-owner", member.accountRole === "owner");
   card.classList.toggle("is-sub-owner", member.accountRole === "sub_owner");
   card.classList.toggle("is-member-card", member.accountRole === "member");
-  if (member.accountRole === "member") {
-    const stamp = document.createElement("span");
-    stamp.className = "member-id-stamp";
-    stamp.textContent = "✓ LEE GON · NEXUS-09";
-    copy.append(stamp);
-  }
+  card.classList.remove("is-flipped");
+  card.setAttribute("role", member.accountRole === "member" ? "button" : "presentation");
+  card.tabIndex = member.accountRole === "member" ? 0 : -1;
   const name = document.createElement("strong");
   name.textContent = member.name.toUpperCase();
   const role = document.createElement("span");
@@ -538,23 +556,72 @@ function showMember(member) {
     joined.textContent = `MEMBER SINCE · ${member.joinedAt.toUpperCase()}`;
     copy.append(joined);
   }
-  document.querySelector("#largeIdCard").append(avatar, copy);
   if (member.accountRole === "member") {
+    const inner = document.createElement("div");
+    inner.className = "member-id-card-inner";
+
+    const front = document.createElement("div");
+    front.className = "member-id-card-face member-id-card-front";
+    front.append(avatar, copy);
+
+    const back = document.createElement("div");
+    back.className = "member-id-card-face member-id-card-back";
+
     const qrButton = document.createElement("button");
     qrButton.className = "member-card-qr-button";
     qrButton.type = "button";
-    qrButton.setAttribute("aria-label", `Enlarge QR code for ${member.name}'s member profile`);
+    qrButton.setAttribute("aria-label", `Open full QR pass for ${member.name}'s profile`);
     const qr = document.createElement("canvas");
     qr.className = "member-card-qr";
     qr.width = 96;
     qr.height = 96;
     qrButton.append(qr);
-    document.querySelector("#largeIdCard").append(qrButton);
+
+    const stamp = document.createElement("span");
+    stamp.className = "member-id-stamp";
+    stamp.setAttribute("aria-label", "Verified NEXUS-09 member");
+    const check = document.createElement("span");
+    check.className = "member-id-stamp-check";
+    check.textContent = "✓";
+    const verified = document.createElement("span");
+    verified.textContent = "VERIFIED";
+    const memberLabel = document.createElement("span");
+    memberLabel.textContent = "MEMBER";
+    stamp.append(check, verified, memberLabel);
+
+    const backHint = document.createElement("small");
+    backHint.className = "member-id-card-hint";
+    backHint.textContent = "TAP TO FLIP BACK";
+    back.append(qrButton, stamp, backHint);
+
+    const toggleCard = () => {
+      const isFlipped = card.classList.toggle("is-flipped");
+      card.setAttribute("aria-label", isFlipped ? `Flip ${member.name}'s membership card to the front` : `Flip ${member.name}'s membership card to the back`);
+      card.setAttribute("aria-pressed", String(isFlipped));
+    };
+
+    card.setAttribute("aria-label", `Flip ${member.name}'s membership card to the back`);
+    card.setAttribute("aria-pressed", "false");
+    card.addEventListener("click", (event) => {
+      if (event.target instanceof Element && event.target.closest("button")) return;
+      toggleCard();
+    });
+    card.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        toggleCard();
+      }
+    });
+
+    qrButton.addEventListener("click", () => openMemberPass(member.id));
+    inner.append(front, back);
+    card.append(inner);
     renderMemberQr(qr, member.id, 96).catch((error) => {
       console.error("Could not create the member ID card QR code.", error);
       showToast("This member ID card's QR code could not be loaded.");
     });
-    qrButton.addEventListener("click", () => openMemberPass(member.id));
+  } else {
+    card.append(avatar, copy);
   }
   document.querySelector("#memberName").textContent = member.name;
   document.querySelector("#memberBio").textContent = member.bio;
@@ -1017,6 +1084,15 @@ function messageElement(message, reactions = []) {
     refresh: loadMessages,
     showToast
   });
+  addDeleteMessageButton(copy, {
+    supabase,
+    table: "messages",
+    messageId: message.id,
+    own,
+    canModerate: ["owner", "sub_owner"].includes(currentProfile?.role),
+    refresh: loadMessages,
+    showToast
+  });
   if (!own && communityFeatures) {
     addReportButton(heading, {
       kind: "group",
@@ -1183,6 +1259,15 @@ function powerRoomMessageElement(message) {
   copy.append(heading);
   if (replyQuote) copy.append(replyQuote);
   copy.append(body, createReplyAction(() => setReplyDraft("power", message)), pinButton);
+  addDeleteMessageButton(copy, {
+    supabase,
+    table: "power_room_messages",
+    messageId: message.id,
+    own,
+    canModerate: ["owner", "sub_owner"].includes(currentProfile?.role),
+    refresh: loadPowerRoomMessages,
+    showToast
+  });
   item.append(avatar, copy);
   return item;
 }
@@ -1367,27 +1452,87 @@ async function removePowerRoomChannel() {
   if (status !== "ok") console.error("Could not close the Power Room realtime channel.", status);
 }
 
-async function openPowerRoom() {
+document.querySelector("#powerRoomDialog").addEventListener("close", () => {
+  window.clearTimeout(powerRoomExpiryTimer);
+  powerRoomExpiryTimer = undefined;
+  powerRoomExpiresAt = 0;
+  void removePowerRoomChannel();
+});
+
+document.querySelector("#powerRoomAccessDialog").addEventListener("close", () => {
+  document.querySelector("#powerRoomAccessForm").reset();
+  document.querySelector("#powerRoomAccessError").textContent = "";
+});
+
+document.querySelector("#powerRoomAccessForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const errorBox = document.querySelector("#powerRoomAccessError");
+  const button = form.querySelector('button[type="submit"]');
+  errorBox.textContent = "";
+  button.disabled = true;
+  try {
+    const { data, error } = await supabase.functions.invoke("manage-power-room", {
+      body: {
+        action: "unlock",
+        secret: document.querySelector("#powerRoomAccessCode").value
+      }
+    });
+    if (error || data?.error) {
+      const message = await edgeFunctionError(error, data, "Power Room access could not be checked.");
+      if (message === "The Main Owner must set a Power Room code in Ownership Settings first.") {
+        document.querySelector("#powerRoomAccessDialog").close();
+        if (currentProfile?.role === "owner") {
+          document.querySelector("#ownershipNav").click();
+        } else {
+          showToast("Ask the Main Owner to set the shared Power Room code.");
+        }
+      }
+      throw new Error(message);
+    }
+    if (data?.unlocked !== true || typeof data.expiresAt !== "string") {
+      throw new Error("The server did not confirm Power Room access.");
+    }
+    document.querySelector("#powerRoomAccessDialog").close();
+    await openPowerRoom(data.expiresAt);
+  } catch (error) {
+    console.error("Could not unlock the NEXUS-09 Power Room.", error);
+    errorBox.textContent = error.message || "Power Room access could not be checked.";
+  } finally {
+    button.disabled = false;
+  }
+});
+
+async function openPowerRoom(expiresAt) {
   if (!["owner", "sub_owner"].includes(currentProfile?.role)) {
     showToast("Only the Main Owner and Sub-owner can open Power Room.");
     return;
   }
+  const expiresAtMs = Date.parse(expiresAt);
+  if (!Number.isFinite(expiresAtMs) || expiresAtMs <= Date.now()) {
+    throw new Error("Power Room access expired. Enter the code again.");
+  }
   try {
     await loadPowerRoomMessages();
+    powerRoomExpiresAt = expiresAtMs;
     openDialog(document.querySelector("#powerRoomDialog"));
+    powerRoomExpiryTimer = window.setTimeout(() => {
+      if (!document.querySelector("#powerRoomDialog").open) return;
+      document.querySelector("#powerRoomDialog").close();
+      showToast("Power Room access expired. Enter the code again to reopen.");
+    }, Math.max(0, expiresAtMs - Date.now()));
     await markPowerRoomRead();
     subscribeToPowerRoom();
     await refreshPowerRoomUnreadCount();
     window.setTimeout(() => document.querySelector("#powerRoomInput").focus(), 30);
   } catch (error) {
+    if (document.querySelector("#powerRoomDialog").open) {
+      document.querySelector("#powerRoomDialog").close();
+    }
     console.error("Could not load Power Room messages.", error);
     showToast(friendlyError(error, "Power Room could not be opened."));
   }
 }
-
-document.querySelector("#powerRoomDialog").addEventListener("close", () => {
-  void removePowerRoomChannel();
-});
 
 document.querySelector("#powerRoomForm").addEventListener("submit", async (event) => {
   event.preventDefault();

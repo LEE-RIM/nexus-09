@@ -6,6 +6,9 @@
     <meta name="theme-color" content="#090d12">
     <meta name="description" content="NEXUS-09: a private member community with a secret lab, member IDs, and a shared inner-room chat.">
     <title>NEXUS-09 — Restricted Access</title>
+    <link rel="manifest" href="./manifest.webmanifest">
+    <link rel="icon" href="./icons/nexus-09.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="./icons/nexus-09-192.png">
     <link rel="stylesheet" href="./styles.css">
   </head>
   <body>
@@ -95,6 +98,7 @@
           </div>
           <div class="head-actions">
             <span class="online-count"><i></i><strong id="onlineCount">08</strong> ONLINE</span>
+            <button class="outline-button install-app-button" id="installAppButton" type="button" hidden>＋ INSTALL APP</button>
             <button class="outline-button" id="inviteButton" type="button"><span>＋</span> Invite member</button>
           </div>
         </div>
@@ -272,8 +276,8 @@
       </div>
     </dialog>
 
-    <dialog class="app-dialog wide-dialog" id="chatDialog">
-      <div class="dialog-shell content-shell">
+    <dialog class="app-dialog wide-dialog chat-fullscreen" id="chatDialog">
+      <div class="dialog-shell content-shell chat-fullscreen-shell">
         <button class="dialog-close" data-close type="button" aria-label="Close dialog">×</button>
         <p class="overline"><span class="tiny-dot"></span> ENCRYPTED CHANNEL <span class="slash">/</span> <span id="activeRoomName">#INNER-CIRCLE</span></p>
         <h2>Group channel <button class="secondary-button room-switch-button" id="switchRoomButton" type="button" hidden>SWITCH ROOM</button><span class="channel-live"><i></i> DEMO</span></h2>
@@ -287,12 +291,12 @@
       </div>
     </dialog>
 
-    <dialog class="app-dialog wide-dialog power-room-dialog" id="powerRoomDialog">
-      <div class="dialog-shell content-shell">
+    <dialog class="app-dialog wide-dialog power-room-dialog chat-fullscreen" id="powerRoomDialog">
+      <div class="dialog-shell content-shell chat-fullscreen-shell">
         <button class="dialog-close" data-close type="button" aria-label="Close dialog">×</button>
         <p class="overline"><span class="power-room-dot"></span> OWNER TEAM ONLY <span class="slash">/</span> PERMANENT CHANNEL</p>
         <h2>Power Room <span class="channel-live"><i></i> PRIVATE</span></h2>
-        <p class="dialog-copy power-room-copy">A private chat for the Main Owner and Sub-owner. Access stays active while you hold an owner-team role; no 30-minute room code is needed.</p>
+        <p class="dialog-copy power-room-copy">A private chat for the Main Owner and Sub-owner. Enter the shared Power Room code to unlock it for 30 minutes.</p>
         <aside class="power-room-pin" id="powerRoomPin" aria-live="polite" hidden></aside>
         <div class="power-room-thread" id="powerRoomThread" tabindex="0" aria-live="polite"><p class="feature-empty">Loading private messages…</p></div>
         <div class="reply-compose-slot" id="powerRoomReplyPreview" hidden></div>
@@ -302,6 +306,22 @@
           <button type="submit" aria-label="Send Power Room message">↑</button>
         </form>
         <p class="chat-demo-note">POWER ROOM HISTORY DOES NOT EXPIRE WITH STANDARD ROOM ACCESS.</p>
+      </div>
+    </dialog>
+
+    <dialog class="app-dialog" id="powerRoomAccessDialog">
+      <div class="dialog-shell">
+        <button class="dialog-close" data-close type="button" aria-label="Close dialog">×</button>
+        <span class="dialog-mark">⌑</span>
+        <p class="overline">OWNER TEAM <span class="slash">/</span> SECONDARY CLEARANCE</p>
+        <h2>Unlock Power Room.</h2>
+        <p class="dialog-copy">Enter the shared owner-team code. Access is verified by the server and expires after 30 minutes.</p>
+        <form class="dialog-form" id="powerRoomAccessForm">
+          <label for="powerRoomAccessCode">POWER ROOM SECRET CODE</label>
+          <input class="dark-input" id="powerRoomAccessCode" type="password" minlength="12" maxlength="128" autocomplete="current-password" required>
+          <p class="dialog-error" id="powerRoomAccessError" role="status"></p>
+          <button class="primary-button" type="submit">VERIFY AND ENTER →</button>
+        </form>
       </div>
     </dialog>
 
@@ -359,8 +379,8 @@
       </div>
     </dialog>
 
-    <dialog class="app-dialog wide-dialog" id="directMessagesDialog">
-      <div class="dialog-shell content-shell">
+    <dialog class="app-dialog wide-dialog chat-fullscreen" id="directMessagesDialog">
+      <div class="dialog-shell content-shell chat-fullscreen-shell">
         <button class="dialog-close" data-close type="button" aria-label="Close dialog">×</button>
         <p class="overline"><span class="tiny-dot"></span> MEMBER-TO-MEMBER <span class="slash">/</span> PRIVATE CHANNELS</p>
         <h2>Direct messages <span class="channel-live"><i></i> PRIVATE</span></h2>
@@ -407,6 +427,18 @@
           <select class="dark-input" id="subOwnerSelect"></select>
           <button class="primary-button" type="submit">SAVE SUB-OWNER →</button>
           <p class="dialog-error" id="subOwnerError" role="status"></p>
+        </form>
+        <form class="dialog-form ownership-section" id="powerRoomSecretForm">
+          <h3>Power Room access code</h3>
+          <p class="dialog-copy" id="powerRoomSecretStatus">Loading Power Room code status…</p>
+          <label for="currentPowerRoomSecret">CURRENT CODE (ONLY WHEN CHANGING)</label>
+          <input class="dark-input" id="currentPowerRoomSecret" type="password" minlength="12" maxlength="128" autocomplete="off">
+          <label for="newPowerRoomSecret">NEW SHARED CODE (12+ CHARACTERS)</label>
+          <input class="dark-input" id="newPowerRoomSecret" type="password" minlength="12" maxlength="128" autocomplete="new-password" required>
+          <label for="confirmPowerRoomSecret">CONFIRM NEW CODE</label>
+          <input class="dark-input" id="confirmPowerRoomSecret" type="password" minlength="12" maxlength="128" autocomplete="new-password" required>
+          <button class="primary-button" type="submit">SAVE POWER ROOM CODE →</button>
+          <p class="dialog-error" id="powerRoomSecretError" role="status"></p>
         </form>
         <form class="dialog-form ownership-section" id="transferSecretForm">
           <h3>Ownership transfer secret</h3>
@@ -462,5 +494,6 @@
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="./config.js"></script>
     <script type="module" src="./app.js"></script>
+    <script src="./install.js"></script>
   </body>
 </html>

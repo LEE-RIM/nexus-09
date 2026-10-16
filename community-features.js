@@ -112,6 +112,37 @@ export function addReportButton(container, { kind, messageId, body, openReport }
   container.append(button);
 }
 
+export function addDeleteMessageButton(container, {
+  supabase, table, messageId, own, canModerate, refresh, showToast
+}) {
+  if (!own && !canModerate) return;
+  const actions = document.createElement("div");
+  actions.className = "message-feature-actions";
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "feature-action-button message-delete-button";
+  button.textContent = "Delete";
+  button.setAttribute("aria-label", "Delete this message for everyone");
+  button.addEventListener("click", async () => {
+    if (!window.confirm("Delete this message for everyone? This cannot be undone.")) return;
+    button.disabled = true;
+    try {
+      const { data, error } = await supabase.from(table).delete().eq("id", messageId).select("id").maybeSingle();
+      if (error) throw error;
+      if (!data) throw new Error("The message was not deleted. It may already be gone or you may not have permission.");
+      await refresh();
+      showToast("Message deleted for everyone.");
+    } catch (error) {
+      console.error("Could not delete a NEXUS-09 message.", error);
+      showToast(error.message || "Message could not be deleted. Check your access and try again.");
+    } finally {
+      button.disabled = false;
+    }
+  });
+  actions.append(button);
+  container.append(actions);
+}
+
 function isOneGrapheme(value) {
   if (!value || Array.from(value).length > 16) return false;
   if (typeof Intl.Segmenter === "function") {
@@ -161,6 +192,7 @@ export function initCommunityFeatures({
     document.querySelector("#dmForm").addEventListener("submit", sendDirectMessage);
     document.querySelector("#reportForm").addEventListener("submit", submitReport);
     document.querySelector("#subOwnerForm").addEventListener("submit", appointSubOwner);
+    document.querySelector("#powerRoomSecretForm").addEventListener("submit", savePowerRoomSecret);
     document.querySelector("#transferSecretForm").addEventListener("submit", saveTransferSecret);
     document.querySelector("#ownershipTransferForm").addEventListener("submit", transferOwnership);
     document.querySelector("#reportDialog").addEventListener("close", () => {
@@ -231,9 +263,17 @@ export function initCommunityFeatures({
     if (getCurrentProfile()?.role !== "owner") return;
     populateOwnershipSelects();
     document.querySelector("#subOwnerError").textContent = "";
+    document.querySelector("#powerRoomSecretError").textContent = "";
     document.querySelector("#transferSecretError").textContent = "";
     document.querySelector("#ownershipTransferError").textContent = "";
     openDialog(document.querySelector("#ownershipDialog"));
+    try {
+      await loadPowerRoomSecretStatus();
+    } catch (error) {
+      console.error("Could not load the Power Room code status.", error);
+      document.querySelector("#powerRoomSecretStatus").textContent =
+        error.message || "Power Room code status could not be loaded.";
+    }
   }
 
   async function callOwnershipFunction(payload) {
@@ -270,6 +310,77 @@ export function initCommunityFeatures({
     } catch (error) {
       console.error("Could not update the NEXUS-09 sub-owner.", error);
       errorBox.textContent = error.message || "The sub-owner could not be updated.";
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  async function loadPowerRoomSecretStatus() {
+    const { data, error } = await supabase.functions.invoke("manage-power-room", {
+      body: { action: "get_code_status" }
+    });
+    if (error || data?.error) {
+      let message = data?.error;
+      if (!message && error?.context instanceof Response) {
+        try {
+          const response = await error.context.clone().json();
+          if (typeof response?.error === "string") message = response.error;
+        } catch (parseError) {
+          console.error("Could not read the Power Room code status response.", parseError);
+        }
+      }
+      throw new Error(message || error?.message || "Power Room code status could not be loaded.");
+    }
+    if (typeof data?.configured !== "boolean") {
+      throw new Error("Power Room code status returned an invalid response.");
+    }
+    document.querySelector("#powerRoomSecretStatus").textContent = data.configured
+      ? "A shared code is set. Changing it requires the current code. Only its SHA-256 hash is stored."
+      : "No code is set yet. Set a private shared code for the Main Owner and Sub-owner. Only its SHA-256 hash is stored.";
+    const currentCodeInput = document.querySelector("#currentPowerRoomSecret");
+    currentCodeInput.required = data.configured;
+    currentCodeInput.disabled = !data.configured;
+  }
+
+  async function savePowerRoomSecret(event) {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const errorBox = document.querySelector("#powerRoomSecretError");
+    const button = form.querySelector('button[type="submit"]');
+    errorBox.textContent = "";
+    const newSecret = document.querySelector("#newPowerRoomSecret").value;
+    if (newSecret !== document.querySelector("#confirmPowerRoomSecret").value) {
+      errorBox.textContent = "The new Power Room codes do not match.";
+      return;
+    }
+    button.disabled = true;
+    try {
+      const { data, error } = await supabase.functions.invoke("manage-power-room", {
+        body: {
+          action: "set_code",
+          currentSecret: document.querySelector("#currentPowerRoomSecret").value || undefined,
+          newSecret,
+          confirmSecret: document.querySelector("#confirmPowerRoomSecret").value
+        }
+      });
+      if (error || data?.error) {
+        let message = data?.error;
+        if (!message && error?.context instanceof Response) {
+          try {
+            const response = await error.context.clone().json();
+            if (typeof response?.error === "string") message = response.error;
+          } catch (parseError) {
+            console.error("Could not read the Power Room code update response.", parseError);
+          }
+        }
+        throw new Error(message || error?.message || "The Power Room code could not be saved.");
+      }
+      form.reset();
+      await loadPowerRoomSecretStatus();
+      showToast("Power Room shared code saved.");
+    } catch (error) {
+      console.error("Could not save the Power Room code.", error);
+      errorBox.textContent = error.message || "The Power Room code could not be saved.";
     } finally {
       button.disabled = false;
     }
@@ -583,6 +694,15 @@ export function initCommunityFeatures({
       });
       addReportButton(item.querySelector(".chat-message-heading"), {
         kind: "direct", messageId: message.id, body: message.body, openReport
+      });
+      addDeleteMessageButton(item.querySelector(".chat-message-copy"), {
+        supabase,
+        table: "direct_messages",
+        messageId: message.id,
+        own: message.sender_id === profile.id,
+        canModerate: ["owner", "sub_owner"].includes(profile.role),
+        refresh: loadDirectMessages,
+        showToast
       });
       item.querySelector(".chat-message-copy").append(createReplyAction(() => setDirectReply(message)));
       return item;
